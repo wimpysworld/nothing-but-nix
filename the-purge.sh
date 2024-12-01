@@ -142,4 +142,4 @@ stuffToDelete+=(
 )
 
 systemctl stop "${stuffToStop[@]}"
-sudo rm -rvf "${stuffToDelete[@]}"
+sudo rm -rf "${stuffToDelete[@]}"
