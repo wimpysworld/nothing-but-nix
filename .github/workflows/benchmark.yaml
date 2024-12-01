@@ -1,0 +1,14 @@
+name: Debug shell
+on:
+  workflow_dispatch:
+jobs:
+  debug-shell:
+    name: "Open debug shell to inspect the disk usage"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this action
+        uses: actions/checkout@v4
+        with:
+          path: ./.github/actions/this
+      - name: Run this action
+        uses: ./.github/actions/this
