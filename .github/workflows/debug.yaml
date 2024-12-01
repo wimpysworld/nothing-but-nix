@@ -12,3 +12,7 @@ jobs:
           path: ./.github/actions/this
       - name: Run this action
         uses: ./.github/actions/this
+      - name: Install ncdu
+        run: apt install ncdu
+      - name: Setup shell stuff for NCDU and stuff
+        uses: mxschmitt/action-tmate@v3
