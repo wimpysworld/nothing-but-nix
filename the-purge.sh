@@ -7,7 +7,6 @@ docker system prune --all --force
 
 #doc: Get rid of snap once and for all (~1GB)
 
-{
 sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
   Package: snapd
   Pin: release a=*
@@ -17,7 +16,6 @@ EOF
 sudo systemctl stop snapd.service
 sudo umount --recursive /snap ~/snap
 sudo rm -rf  ~/snap /snap /var/snap /var/lib/snapd
-} &
 
 stuffToStop=()
 stuffToDelete=()
