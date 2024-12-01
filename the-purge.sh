@@ -178,7 +178,6 @@ stuffToDelete+=(
 ~/.rustup # (~500MB)
 ~/.cargo # (~250MB)
 ~/.dotnet # (~50MB)
-~/.nvm # (~5MB)
 )
 
 
