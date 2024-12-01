@@ -13,9 +13,11 @@ sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
   Pin: release a=*
   Pin-Priority: -10
 EOF
-} &
 
-while wait -n; do : ; done; # wait until it's possible to wait for bg job
+systemctl stop snapd.service
+
+sudo rm -rf  ~/snap /snap /var/snap /var/lib/snapd
+} &
 
 stuffToStop=()
 stuffToDelete=()
@@ -24,20 +26,13 @@ stuffToDelete=()
 
 stuffToStop+=(
   mono-xsp4.service
-  snapd.service
   rsyslog.service
   chrony.service
   php8.1-fpm.service
-  snapd.service
 )
 
 
 stuffToDelete+=(
-~/snap
-/snap
-/var/snap
-/var/lib/snapd
-
 #doc: Remove unnecessary stuff in /opt (~11GB)
 
 /opt/hostedtoolcache
@@ -171,7 +166,6 @@ stuffToDelete+=(
 ~/.cargo # (~250MB)
 ~/.dotnet # (~50MB)
 )
-
 
 for svc in "${stuffToStop[@]}"; do
   {
