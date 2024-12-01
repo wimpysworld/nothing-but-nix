@@ -1,6 +1,7 @@
 echo info
 ls /usr/bin
 realpath /usr/bin/bash
+realpath /home/runner/runners/2.321.0/externals/node20/bin/node
 
 #doc: Docker
 
