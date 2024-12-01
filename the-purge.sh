@@ -1,22 +1,13 @@
-stuffToStop=()
-stuffToDelete=()
-
-#doc: Stop services
-
-stuffToStop+=(
-  mono-xsp4.service
-  snapd.service
-  rsyslog.service
-  chrony.service
-  php8.1-fpm.service
-)
-
 #doc: Docker
 
+{
 docker image rm $(docker image ls --format '{{.ID}}')
+docker system prune --all --force
+} &
 
 #doc: Get rid of snap once and for all (~1GB)
 
+{
 sudo snap remove lxd core20 snapd
 
 sudo systemctl stop snapd
@@ -31,6 +22,23 @@ sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
   Pin: release a=*
   Pin-Priority: -10
 EOF
+} &
+
+while wait -n; do : ; done; # wait until it's possible to wait for bg job
+
+stuffToStop=()
+stuffToDelete=()
+
+#doc: Stop services
+
+stuffToStop+=(
+  mono-xsp4.service
+  snapd.service
+  rsyslog.service
+  chrony.service
+  php8.1-fpm.service
+)
+
 
 stuffToDelete+=(
 ~/snap
@@ -139,5 +147,18 @@ stuffToDelete+=(
 /var/cache/*
 )
 
-sudo systemctl stop "${stuffToStop[@]}"
-sudo rm -rf "${stuffToDelete[@]}"
+
+for svc in "${stuffToStop[@]}"; do
+  {
+  echo "Stop: $svc"
+  sudo systemctl stop "$svc"
+  } &
+done
+for item in "${stuffToDelete[@]}"; do
+  {
+  echo "Remove: $item"
+  sudo rm -rf "$item"
+  } &
+done
+
+while wait -n; do : ; done; # wait until it's possible to wait for bg job
