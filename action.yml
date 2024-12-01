@@ -11,6 +11,12 @@ runs:
       shell: bash
       run: |
         sudo df -h
+    - name: Start the purge
+      shell: bash
+      run: |
+        bash the-purge.sh
+    #--start-placeholder
+    #--end-placeholder
     - name: Check disk usage after
       shell: bash
       run: |
