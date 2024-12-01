@@ -14,8 +14,8 @@ sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
   Pin-Priority: -10
 EOF
 
-systemctl stop snapd.service
-
+sudo systemctl stop snapd.service
+sudo umount --recursive /snap ~/snap
 sudo rm -rf  ~/snap /snap /var/snap /var/lib/snapd
 } &
 
