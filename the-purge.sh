@@ -8,15 +8,6 @@ docker system prune --all --force
 #doc: Get rid of snap once and for all (~1GB)
 
 {
-sudo snap remove lxd core20 snapd
-
-sudo systemctl stop snapd
-sudo systemctl disable snapd
-sudo systemctl mask snapd
-
-sudo apt purge snapd -y
-sudo apt-mark hold snapd
-
 sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
   Package: snapd
   Pin: release a=*
@@ -37,6 +28,7 @@ stuffToStop+=(
   rsyslog.service
   chrony.service
   php8.1-fpm.service
+  snapd.service
 )
 
 
