@@ -17,9 +17,7 @@ docker image rm $(docker image ls --format '{{.ID}}')
 
 #doc: Get rid of snap once and for all (~1GB)
 
-sudo snap remove core20
-sudo snap remove lxd
-sudo snap remove snapd
+sudo snap remove lxd core20 snapd
 
 sudo systemctl stop snapd
 sudo systemctl disable snapd
