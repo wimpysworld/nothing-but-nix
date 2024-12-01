@@ -1,0 +1,17 @@
+name: 'I Only Care About Nix'
+description: 'Removes all the crap a GitHub Actions VM has so the most space possible is used by Nix'
+branding:
+  icon: 'crop'
+  color: 'red'
+# inputs:
+runs:
+  using: composite
+  steps:
+    - name: Check disk usage before
+      shell: bash
+      run: |
+        sudo df -h
+    - name: Check disk usage after
+      shell: bash
+      run: |
+        sudo df -h
