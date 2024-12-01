@@ -15,7 +15,7 @@ EOF
 
 sudo systemctl stop snapd.service
 sudo umount --recursive /snap ~/snap
-sudo rm -rf  ~/snap /snap /var/snap /var/lib/snapd
+sudo rm -rf  ~/snap /snap /var/snap /var/lib/snapd /usr/lib/snapd
 
 stuffToStop=()
 stuffToDelete=()
@@ -125,11 +125,18 @@ stuffToDelete+=(
 /usr/sbin/nginx*
 
 /usr/lib/jvm # (~1.1GB)
-# /usr/lib/x86_64-linux-gnu # (~1.0GB)
+/usr/lib/x86_64-linux-gnu/libLLVM* # (~300MB)
+/usr/lib/x86_64-linux-gnu/libclang* # (~100MB)
+/usr/lib/x86_64-linux-gnu/liblldb* # (~50MB)
+/usr/lib/x86_64-linux-gnu/libmysql* # (~30MB)
+
+/usr/lib/x86_64-linux-gnu/*perl* # (~25MB)
+/usr/lib/x86_64-linux-gnu/*ruby* # (~5MB)
+
 /usr/lib/google-cloud-sdk # (~1.0GB)
 /usr/lib/gcc # (~500MB)
 /usr/lib/llvm* # (~1.5GB)
-/usr/lib/mono # (~500MB)
+/usr/lib/*mono* # (~500MB)
 /usr/lib/heroku # (~300MB)
 /usr/lib/firefox # (~300MB)
 /usr/lib/R # (~100MB)
