@@ -145,6 +145,20 @@ stuffToDelete+=(
 /var/lib/mecab
 /var/lib/postgresql
 /var/cache/*
+
+#doc: /usr/share stuff
+/usr/share/swift #  (~2.5GB)
+/usr/share/dotnet #  (~1.5GB)
+/usr/share/miniconda #  (~600MB)
+/usr/share/az* #  (~500MB)
+/usr/share/sbt #  (~150MB)
+/usr/share/gradle* #  (~150MB)
+/usr/share/kotlin* #  (~100MB)
+/usr/share/ri #  (~50MB)
+/usr/share/mecab #  (~50MB)
+/usr/share/java #  (~50MB)
+/usr/share/perl #  (~20MB)
+/usr/share/R #  (~20MB)
 )
 
 
