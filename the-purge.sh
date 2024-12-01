@@ -139,5 +139,5 @@ stuffToDelete+=(
 /var/cache/*
 )
 
-systemctl stop "${stuffToStop[@]}"
+sudo systemctl stop "${stuffToStop[@]}"
 sudo rm -rf "${stuffToDelete[@]}"
