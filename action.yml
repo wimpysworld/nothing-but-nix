@@ -14,6 +14,7 @@ runs:
     - name: Start the purge
       shell: bash
       run: |
+        ls -a
         bash the-purge.sh
     #--start-placeholder
     #--end-placeholder
