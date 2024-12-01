@@ -13,6 +13,6 @@ jobs:
       - name: Run this action
         uses: ./.github/actions/this
       - name: Install ncdu
-        run: apt install ncdu
+        run: sudo apt install -y ncdu
       - name: Setup shell stuff for NCDU and stuff
         uses: mxschmitt/action-tmate@v3
