@@ -1,8 +1,3 @@
-echo info
-ls /usr/bin
-realpath /usr/bin/bash
-realpath /home/runner/runners/2.321.0/externals/node20/bin/node
-
 #doc: Docker
 
 {
@@ -172,17 +167,7 @@ stuffToDelete+=(
 ~/.dotnet # (~50MB)
 )
 
-for svc in "${stuffToStop[@]}"; do
-  {
-  echo "Stop: $svc"
-  sudo systemctl stop "$svc"
-  } &
-done
-for item in "${stuffToDelete[@]}"; do
-  {
-  echo "Remove: $item"
-  sudo rm -rf "$item"
-  } &
-done
+sudo systemctl stop "${stuffToStop[@]}" &
+sudo rm -rf "${stuffToDelete[@]}" &
 
 while wait -n; do : ; done; # wait until it's possible to wait for bg job
