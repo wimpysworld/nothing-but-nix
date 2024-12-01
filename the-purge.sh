@@ -65,7 +65,7 @@ stuffToDelete+=(
 /usr/local/lib/lein
 
 #doc: Remove ghcup (~5.5GB)
-/usr/local/lib/.ghcup
+/usr/local/.ghcup
 
 #doc: Remove powershell (~1.2GB)
 /usr/local/share/powershell
@@ -110,7 +110,7 @@ stuffToDelete+=(
 /usr/local/bin/phpunit
 
 #doc: Remove julia (~900MB)
-/usr/local/julia-*
+/usr/local/julia*
 
 #doc: Remove aws (~500MB)
 /usr/local/aws-*
@@ -139,6 +139,20 @@ stuffToDelete+=(
 /usr/sbin/php*
 /usr/sbin/nginx*
 
+/usr/lib/jvm # (~1.1GB)
+/usr/lib/x86_64-linux-gnu # (~1.0GB)
+/usr/lib/google-cloud-sdk # (~1.0GB)
+/usr/lib/gcc # (~500MB)
+/usr/lib/llvm* # (~1.5GB)
+/usr/lib/mono # (~500MB)
+/usr/lib/heroku # (~300MB)
+/usr/lib/firefox # (~300MB)
+/usr/lib/R # (~100MB)
+/usr/lib/postgresql # (~50MB)
+/usr/lib/ruby # (~20MB)
+/usr/lib/php # (~20MB)
+/usr/lib/mysql # (~5MB)
+
 #doc: /var/lib's (~500MB)
 /var/lib/gems
 /var/lib/mysql
@@ -159,6 +173,12 @@ stuffToDelete+=(
 /usr/share/java #  (~50MB)
 /usr/share/perl #  (~20MB)
 /usr/share/R #  (~20MB)
+
+#doc: Stuff in home
+~/.rustup # (~500MB)
+~/.cargo # (~250MB)
+~/.dotnet # (~50MB)
+~/.nvm # (~5MB)
 )
 
 
