@@ -14,7 +14,7 @@ sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
 EOF
 
 sudo systemctl stop snapd.service
-sudo umount --recursive /snap ~/snap
+sudo umount --recursive /snap/*/*
 sudo rm -rf  ~/snap /snap /var/snap /var/lib/snapd /usr/lib/snapd
 
 stuffToStop=()
