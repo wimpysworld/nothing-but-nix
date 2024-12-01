@@ -125,7 +125,7 @@ stuffToDelete+=(
 /usr/sbin/nginx*
 
 /usr/lib/jvm # (~1.1GB)
-/usr/lib/x86_64-linux-gnu # (~1.0GB)
+# /usr/lib/x86_64-linux-gnu # (~1.0GB)
 /usr/lib/google-cloud-sdk # (~1.0GB)
 /usr/lib/gcc # (~500MB)
 /usr/lib/llvm* # (~1.5GB)
