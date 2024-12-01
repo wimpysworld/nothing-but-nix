@@ -1,3 +1,7 @@
+echo info
+ls /usr/bin
+realpath /usr/bin/bash
+
 #doc: Docker
 
 {
@@ -181,5 +185,3 @@ for item in "${stuffToDelete[@]}"; do
 done
 
 while wait -n; do : ; done; # wait until it's possible to wait for bg job
-
-realpath /usr/bin/bash
