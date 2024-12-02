@@ -7,16 +7,21 @@ branding:
 runs:
   using: composite
   steps:
-    - name: Check disk usage before
+    - name: Check disk usage before cleanup
       shell: bash
       run: |
         sudo df -h
     - name: Start the purge
       shell: bash
       run: ${{ github.action_path }}/the-purge.sh
-    #--start-placeholder
-    #--end-placeholder
-    - name: Check disk usage after
+    - name: Check disk usage after cleanup
+      shell: bash
+      run: |
+        sudo df -h
+    - name: Setup BTRFS join
+      shell: bash
+      run: ${{ github.action_path }}/mountpoint-fusion.sh
+    - name: Check disk usage after BTRFS setup
       shell: bash
       run: |
         sudo df -h
