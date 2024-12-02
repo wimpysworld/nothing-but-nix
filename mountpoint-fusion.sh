@@ -29,6 +29,7 @@ sudo mkdir -p /state
 sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compress=zstd
 
 for dir in /nix; do
+  echo "Bind mounting $dir"
   sudo mkdir -p {/state,}$dir
-  sudo mount -o bind $dir /state$dir
+  sudo mount -o bind "/state$dir" "$dir"
 done
