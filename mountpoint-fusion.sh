@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-root_free_space=$(df -m / | tail -n 1 | awk '{print $3}')
-mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $3}')
+set -eu
+
+root_free_space=$(df -m / | tail -n 1 | awk '{print $4}')
+mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $4}')
 echo "free space of /: ${root_free_space}MB"
 echo "free space of /mnt: ${mnt_free_space}MB"
 
