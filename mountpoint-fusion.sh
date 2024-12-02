@@ -3,8 +3,8 @@
 root_free_space=$(df -m / | tail -n 1 | awk '{print $2}')
 mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $2}')
 
-sudo fallocate -l $((root_free_space - 1024)) /disk.img
-sudo fallocate -l $((mnt_free_space - 1024)) /mnt/disk.img
+sudo fallocate -l $((root_free_space - 1024))M /disk.img
+sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img
 
 
 sudo losetup /dev/loop0 /disk.img
