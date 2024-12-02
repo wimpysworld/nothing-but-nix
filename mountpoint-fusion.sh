@@ -7,15 +7,15 @@ sudo fallocate -l $((root_free_space - 1024))M /disk.img
 sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img
 
 
-sudo losetup /dev/loop0 /disk.img
-sudo losetup /dev/loop1 /mnt/disk.img
+sudo losetup /dev/loop69 /disk.img
+sudo losetup /dev/loop420 /mnt/disk.img
 
 # fvck reliability, gotta go fast
-sudo mkfs.btrfs -d raid0 -m raid0 /dev/loop{0,1}
+sudo mkfs.btrfs -d raid0 -m raid0 /dev/loop{69,420}
 sudo btrfs device scan
 
 sudo mkdir -p /state
-sudo mount /dev/loop0 /state -o defaults,noautodefrag,nobarrier,commit=21600,compression=zstd
+sudo mount /dev/loop69 /state -o defaults,noautodefrag,nobarrier,commit=21600,compression=zstd
 
 for dir in /nix; do
   sudo mkdir -p {/state,}$dir
