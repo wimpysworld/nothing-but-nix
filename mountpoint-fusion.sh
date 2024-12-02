@@ -26,7 +26,7 @@ sudo btrfs filesystem show
 sudo file /dev/loop{69,420}
 
 sudo mkdir -p /state
-sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compression=zstd
+sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compress=zstd
 
 for dir in /nix; do
   sudo mkdir -p {/state,}$dir
