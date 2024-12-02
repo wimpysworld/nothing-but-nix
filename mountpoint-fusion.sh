@@ -2,10 +2,11 @@
 
 root_free_space=$(df -m / | tail -n 1 | awk '{print $3}')
 mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $3}')
+echo "free space of /: ${root_free_space}MB"
+echo "free space of /mnt: ${mnt_free_space}MB"
 
-sudo fallocate -l $((root_free_space - 1024))M /disk.img
-sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img
-
+sudo fallocate -n $((root_free_space - 1024))M /disk.img
+sudo fallocate -n $((mnt_free_space - 1024))M /mnt/disk.img
 
 sudo losetup /dev/loop69 /disk.img
 sudo losetup /dev/loop420 /mnt/disk.img
