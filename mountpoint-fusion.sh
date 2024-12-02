@@ -2,7 +2,7 @@
 
 set -eu
 
-dmesg -w &
+sudo dmesg -w &
 
 root_free_space=$(df -m / | tail -n 1 | awk '{print $4}')
 mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $4}')
@@ -22,6 +22,8 @@ sudo mkfs.btrfs -L actions -d raid0 -m raid0 /dev/loop{69,420}
 sudo btrfs device scan
 
 sudo btrfs filesystem show
+
+sudo file /dev/loop{69,420}
 
 sudo mkdir -p /state
 sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compression=zstd
