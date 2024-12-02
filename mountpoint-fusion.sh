@@ -2,7 +2,7 @@
 
 set -eu
 
-sudo dmesg -w &
+# sudo dmesg -w &
 
 root_free_space=$(df -m / | tail -n 1 | awk '{print $4}')
 mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $4}')
