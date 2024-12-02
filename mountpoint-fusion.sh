@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-root_free_space=$(df -m / | tail -n 1 | awk '{print $2}')
-mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $2}')
+root_free_space=$(df -m / | tail -n 1 | awk '{print $3}')
+mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $3}')
 
 sudo fallocate -l $((root_free_space - 1024))M /disk.img
 sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img
