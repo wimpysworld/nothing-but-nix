@@ -2,6 +2,8 @@
 
 set -eu
 
+dmesg -w &
+
 root_free_space=$(df -m / | tail -n 1 | awk '{print $4}')
 mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $4}')
 echo "free space of /: ${root_free_space}MB"
@@ -22,7 +24,7 @@ sudo btrfs device scan
 sudo btrfs filesystem show
 
 sudo mkdir -p /state
-sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=21600,compression=zstd,device=/dev/loop69,device=/dev/loop420
+sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compression=zstd
 
 for dir in /nix; do
   sudo mkdir -p {/state,}$dir
