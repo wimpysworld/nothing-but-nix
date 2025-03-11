@@ -3,33 +3,41 @@
 set -eu
 
 # sudo dmesg -w &
+function run {
+  echo "run:" "$@"
+  "$@"
+}
 
 root_free_space=$(df -m / | tail -n 1 | awk '{print $4}')
 mnt_free_space=$(df -m /mnt | tail -n 1 | awk '{print $4}')
 echo "free space of /: ${root_free_space}MB"
 echo "free space of /mnt: ${mnt_free_space}MB"
 
-echo sudo fallocate -l $((root_free_space - 1024))M /disk.img
-echo sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img
-sudo fallocate -l $((root_free_space - 1024))M /disk.img
-sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img
+loops=()
+if run sudo fallocate -l $((root_free_space - 1024))M /disk.img; then
+  run sudo losetup /dev/loop69 /disk.img
+  loops+=(/dev/loop69)
+fi
 
-sudo losetup /dev/loop69 /disk.img
-sudo losetup /dev/loop420 /mnt/disk.img
+if run sudo fallocate -l $((mnt_free_space - 1024))M /mnt/disk.img; then
+  run sudo losetup /dev/loop420 /mnt/disk.img
+  loops+=(/dev/loop420)
+fi
+
 
 # fvck reliability, gotta go fast
-sudo mkfs.btrfs -L actions -d raid0 -m raid0 /dev/loop{69,420}
-sudo btrfs device scan
+run sudo mkfs.btrfs -L actions -d raid0 -m raid0 "${loops[@]}"
+run sudo btrfs device scan
 
-sudo btrfs filesystem show
+run sudo btrfs filesystem show
 
-sudo file /dev/loop{69,420}
+run sudo file "${loops[@]}"
 
-sudo mkdir -p /state
-sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compress=zstd
+run sudo mkdir -p /state
+run sudo mount LABEL=actions /state -o defaults,noautodefrag,nobarrier,commit=300,compress=zstd
 
 for dir in /nix; do
   echo "Bind mounting $dir"
-  sudo mkdir -p {/state,}$dir
-  sudo mount -o bind "/state$dir" "$dir"
+  run sudo mkdir -p {/state,}$dir
+  run sudo mount -o bind "/state$dir" "$dir"
 done
