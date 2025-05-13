@@ -1,9 +1,9 @@
-name: Debug
+name: Test
 on:
   workflow_dispatch:
 jobs:
   test-ubuntu:
-    name: Debug ${{ matrix.os }}
+    name: Test ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -27,10 +27,3 @@ jobs:
         run: |
           nix --version
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
-      - name: Debug
-        run: |
-          sudo du -csh /opt/*
-          sudo du -csh /usr/bin/*
-          sudo du -csh /usr/lib/*
-          sudo du -csh /usr/share/*
-          sudo du -csh /var/lib/*

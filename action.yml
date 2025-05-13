@@ -1,27 +1,179 @@
-name: 'I Only Care About Nix'
-description: 'Removes all the crap a GitHub Actions VM has so the most space possible is used by Nix'
+name: 'Nothing but Nix'
+description: 'Removes all the cruft 🪓 from a GitHub Actions runner to make the most space possible for Nix ️❄️'
 branding:
-  icon: 'crop'
+  icon: 'trash-2'
   color: 'red'
-# inputs:
 runs:
   using: composite
   steps:
-    - name: Check disk usage before cleanup
+    - name: Disks before 
       shell: bash
       run: |
         sudo df -h
-    - name: Start the purge
-      shell: bash
-      run: ${{ github.action_path }}/the-purge.sh
-    - name: Check disk usage after cleanup
+    - name: The Checks
+      id: environment-check
       shell: bash
       run: |
-        sudo df -h
-    - name: Setup BTRFS join
+        if [ "$(lsb_release -is)" != "Ubuntu" ]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "This action only works on Ubuntu runners"
+        elif [ -z "$GITHUB_ACTIONS" ]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "This action only works on GitHub Actions runner"
+        elif [ -d /nix ]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "This action must be run before Nix is installed"
+          exit 1
+        else
+          echo "is_supported=true" >> $GITHUB_OUTPUT
+        fi
+    - name: The setup
+      if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
-      run: ${{ github.action_path }}/mountpoint-fusion.sh
-    - name: Check disk usage after BTRFS setup
+      run: |
+        ARCH=$(uname -m)          
+        if [[ "$ARCH" == "x86_64" ]]; then
+          URL_ARCH="x86_64"
+        elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
+          URL_ARCH="aarch64"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+        
+        OS=$(uname -s)
+        if [[ "$OS" == "Linux" ]]; then
+          URL_OS="unknown-linux-gnu"
+        elif [[ "$OS" == "Darwin" ]]; then
+          URL_OS="apple-darwin"
+        else
+          echo "Unsupported OS: $OS"
+          exit 1
+        fi
+        
+        DOWNLOAD_URL="https://github.com/SUPERCILEX/fuc/releases/download/3.0.1/${URL_ARCH}-${URL_OS}-rmz"
+        curl -L -o rmz "$DOWNLOAD_URL"
+        chmod +x rmz
+        sudo mv rmz /usr/bin/rmz
+        rmz --version
+    - name: The Purge
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        echo "Remove docker images"
+        for CRUFT in $(docker image ls --format '{{.ID}}'); do
+          docker rmi --force "${CRUFT}" || true
+        done
+        docker system prune --all --force
+        
+        echo "Remove snap"
+        sudo systemctl stop snapd.service || true
+        sudo systemctl disable snapd.service || true
+        sudo systemctl mask snapd.service || true
+        sudo umount --recursive /snap/*/* || true
+        for CRUFT in /snap /var/snap /var/lib/snapd /usr/lib/snapd "${HOME}/snap"; do
+          sudo rmz -f ${CRUFT}
+        done
+
+        echo "Cleanse apt"
+        sudo apt-get -y autoremove
+        sudo apt-get -y clean
+
+        echo "Cleanse ${HOME}"
+        for CRUFT in "${HOME}/.rustup" "${HOME}/.cargo" "${HOME}/.dotnet"; do
+          sudo rmz -f "${CRUFT}"
+        done
+
+        echo "Remove /usr/local"
+        sudo rmz -f /usr/local
+        echo "Recreate /usr/local"
+        sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
+        
+        echo "Cleanse /opt"
+        sudo rmz -f /opt/hostedtoolcache
+        sudo rmz -f /opt/microsoft
+        sudo rmz -f /opt/az
+        sudo rmz -f /opt/pipx*
+        sudo rmz -f /opt/google
+        sudo rmz -f /opt/mssql-tools
+
+        echo "Remove executables"
+        sudo rmz -f /usr/bin/chrome*
+        sudo rmz -f /usr/bin/firefox*
+        sudo rmz -f /usr/bin/java*
+        sudo rmz -f /usr/bin/mono*
+        sudo rmz -f /usr/bin/mysql*
+        sudo rmz -f /usr/bin/php*
+        sudo rmz -f /usr/sbin/php*
+
+        echo "Remove libraries"
+        sudo rmz -f /usr/lib/dotnet*
+        sudo rmz -f /usr/lib/firefox*
+        sudo rmz -f /usr/lib/google-cloud-sdk
+        sudo rmz -f /usr/lib/heroku*
+        sudo rmz -f /usr/lib/jvm
+        sudo rmz -f /usr/lib/mecab
+        sudo rmz -f /usr/lib/*mono*
+        sudo rmz -f /usr/lib/R
+        sudo rmz -f /usr/lib/ruby
+        sudo rmz -f /usr/lib/php
+
+        echo "Cleanse /usr/share"
+        sudo rmz -f /usr/share/apache-maven*
+        sudo rmz -f /usr/share/az*
+        sudo rmz -f /usr/share/doc/*
+        sudo rmz -f /usr/share/dotnet*
+        sudo rmz -f /usr/share/fonts/*
+        sudo rmz -f /usr/share/google-cloud-sdk
+        sudo rmz -f /usr/share/gradle*
+        sudo rmz -f /usr/share/icons/*
+        sudo rmz -f /usr/share/java
+        sudo rmz -f /usr/share/kotlin*
+        sudo rmz -f /usr/share/man/*
+        sudo rmz -f /usr/share/mecab
+        sudo rmz -f /usr/share/miniconda
+        sudo rmz -f /usr/share/mysql*
+        sudo rmz -f /usr/share/php*
+        sudo rmz -f /usr/share/postgresql*
+        sudo rmz -f /usr/share/R
+        sudo rmz -f /usr/share/ri
+        sudo rmz -f /usr/share/sbt
+        sudo rmz -f /usr/share/swift*
+        sudo rmz -f /usr/share/texinfo
+
+        echo "Cleanse /var/lib"
+        sudo rmz -f /var/lib/gems
+        sudo rmz -f /var/lib/mecab
+        sudo rmz -f /var/lib/mysql*
+        sudo rmz -f /var/lib/php*
+        sudo rmz -f /var/lib/postgresql*
+    - name: The Merge
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        loops=()
+        # Create loop devices for the free space in / and /mnt
+        for ROOT in / /mnt/; do
+          free_space=$(df -m --output=avail "${ROOT}" | tail -n 1 | tr -d ' ')
+          echo "Free space of "${ROOT}": ${free_space}MB"
+          if sudo fallocate -l $((free_space - 1024))M "${ROOT}"disk.img; then
+            loop_dev=$(sudo losetup --find)
+            sudo losetup ${loop_dev} "${ROOT}"disk.img
+            loops+=(${loop_dev})
+          fi
+        done
+          
+        # Create btrfs filesystem
+        sudo mkfs.btrfs -L nix -d raid0 -m raid0 -O no-holes "${loops[@]}"
+        sudo btrfs device scan
+        sudo btrfs filesystem show
+        sudo file "${loops[@]}"
+
+        # Create mount point and mount the filesystem
+        sudo mkdir -p /nix
+        sudo mount LABEL=nix /nix -o noatime,nodatacow,nobarrier,compress=zstd:1,space_cache=v2,ssd,commit=120,discard=async
+    - name: Disk after
+      if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
         sudo df -h
