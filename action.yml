@@ -1,27 +1,167 @@
-name: 'I Only Care About Nix'
-description: 'Removes all the crap a GitHub Actions VM has so the most space possible is used by Nix'
+name: 'Nothing but Nix'
+description: 'Removes all the cruft 🪓 from a GitHub Actions runner to make the most space possible for Nix ️❄️'
 branding:
-  icon: 'crop'
+  icon: 'trash-2'
   color: 'red'
-# inputs:
 runs:
   using: composite
   steps:
-    - name: Check disk usage before cleanup
+    - name: Disk usage before 
       shell: bash
       run: |
         sudo df -h
-    - name: Start the purge
+    - name: The Checks
+      id: environment-check
       shell: bash
-      run: ${{ github.action_path }}/the-purge.sh
-    - name: Check disk usage after cleanup
+      run: |
+        if [ "$(lsb_release -is)" != "Ubuntu" ]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "This action only works on Ubuntu runners"
+        elif [ -z "$GITHUB_ACTIONS" ]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "This action only works on GitHub Actions runner"
+        elif [ -d /nix ]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "This action must be run before Nix is installed"
+          exit 1
+        else
+          echo "is_supported=true" >> $GITHUB_OUTPUT
+        fi
+    - name: The Purge
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        echo "Stop services"
+        for SERVICE in snapd.service mono-xsp4.service rsyslog.service chrony.service php8.1-fpm.service; do
+          sudo systemctl stop "${SERVICE}" || true
+        done
+
+        echo "Delete language ecosystems in ${HOME} (~800MB)"
+        for CRUFT in "${HOME}/.rustup" "${HOME}/.cargo" "${HOME}/.dotnet" "${HOME}/snap"; do
+          sudo rm -rf "${CRUFT}" || true
+        done
+
+        echo "Remove snap (~1GB)"
+        sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
+        Package: snapd
+        Pin: release a=*
+        Pin-Priority: -10
+        EOF
+        sudo umount --recursive /snap/*/*
+        for CRUFT in /snap /var/snap /var/lib/snapd /usr/lib/snapd; do
+          sudo rm -rf "${CRUFT}" || true
+        done
+
+        echo "Remove docker images"
+        for CRUFT in $(docker image ls --format '{{.ID}}'); do
+          sudo docker rmi --force "${CRUFT}" || true
+        done
+        docker system prune --all --force || true
+
+        echo "Remove unnecessary stuff from /opt (11GB)"
+        for CRUFT IN /opt/hostedtoolcache /opt/microsoft /opt/az /opt/pipx /opt/google /opt/mssql-tools; do
+          sudo rm -rf "${CRUFT}" || true
+        done
+        
+        echo "Remove /usr/local/bin (>1GB)"
+        sudo rm -rf /usr/local/bin/* || true
+        echo "Remove /usr/local/lib/*" (>10GB)
+        sudo rm -rf /usr/local/lib/* || true
+        echo "Remove /usr/local/share/*" (~2GB)
+        sudo rm -rf /usr/local/share/* || true
+
+        echo "Remove ghcup (~5.5GB)"
+        sudo rm -rf /usr/local/.ghcup || true
+        echo "Remove julia (~900MB)"
+        sudo rm -rf /usr/local/julia* || true
+        echo "Remove aws (~500MB)"
+        sudo rm -rf /usr/local/aws-* || true
+        echo "Remove n (~200MB)"
+        sudo rm -rf /usr/local/n || true
+        echo "Remove sqlpackage (~100MB)"
+        sudo rm -rf /usr/local/sqlpackage || true
+        echo "Remove docs (~50MB)"
+        sudo rm -rf /usr/local/doc/* || true
+
+        echo "Remove executable (>1GB)"
+        sudo rm -rf /usr/bin/kubectl || true
+        sudo rm -rf /usr/bin/x86_64-* || true
+        sudo rm -rf /usr/bin/buildah || true 
+        sudo rm -rf /usr/bin/my* || true
+        sudo rm -rf /usr/bin/pedump || true
+        sudo rm -rf /usr/bin/skopeo || true
+        sudo rm -rf /usr/bin/php* || true
+        sudo rm -rf /usr/bin/mono* || true
+        sudo rm -rf /usr/bin/perl* || true
+        sudo rm -rf /usr/sbin/php* || true
+        sudo rm -rf /usr/sbin/mysql* || true
+        sudo rm -rf /usr/sbin/nginx* || true
+
+        echo "Remove libraries (~6GB)"
+        sudo rm -rf /usr/lib/jvm || true
+        sudo rm -rf /usr/lib/x86_64-linux-gnu/libLLVM* || true
+        sudo rm -rf /usr/lib/x86_64-linux-gnu/libclang* || true
+        sudo rm -rf /usr/lib/x86_64-linux-gnu/liblldb* || true
+        sudo rm -rf /usr/lib/x86_64-linux-gnu/libmysql* || true
+        sudo rm -rf /usr/lib/x86_64-linux-gnu/*perl* || true
+        sudo rm -rf /usr/lib/x86_64-linux-gnu/*ruby* || true
+        sudo rm -rf /usr/lib/google-cloud-sdk || true
+        sudo rm -rf /usr/lib/gcc || true
+        sudo rm -rf /usr/lib/llvm* || true
+        sudo rm -rf /usr/lib/mysql || true
+        sudo rm -rf /usr/lib/*mono* || true
+        sudo rm -rf /usr/lib/heroku || true
+        sudo rm -rf /usr/lib/firefox || true
+        sudo rm -rf /usr/lib/R || true
+        sudo rm -rf /usr/lib/ruby || true
+        sudo rm -rf /usr/lib/php || true
+
+        echo "Cleanse /var/lib (~500MB)"
+        sudo rm -rf /var/lib/gems || true
+        sudo rm -rf /var/lib/mecab || true
+        sudo rm -rf /var/lib/mysql || true
+        sudo rm -rf /var/lib/postgresql || true
+
+        echo "Cleanse /usr/share (~6GB)"
+        sudo rm -rf /usr/share/swift || true
+        sudo rm -rf /usr/share/dotnet || true
+        sudo rm -rf /usr/share/miniconda || true
+        sudo rm -rf /usr/share/az* || true
+        sudo rm -rf /usr/share/sbt || true
+        sudo rm -rf /usr/share/gradle* || true
+        sudo rm -rf /usr/share/kotlin* || true
+        sudo rm -rf /usr/share/ri || true
+        sudo rm -rf /usr/share/mecab || true
+        sudo rm -rf /usr/share/java || true
+        sudo rm -rf /usr/share/perl* || true
+        sudo rm -rf /usr/share/postgresql || true
+        sudo rm -rf /usr/share/R || true 
+        sudo rm -rf /usr/share/apache-maven* || true
+        sudo rm -rf /usr/share/mysql || true
+        sudo rm -rf /usr/share/texinfo || true
+        sudo rm -rf /usr/share/swig* || true
+        sudo rm -rf /usr/share/tcltk || true
+        sudo rm -rf /usr/share/python-wheels || true
+        sudo rm -rf /usr/share/php || true
+        sudo rm -rf /usr/share/google-cloud-sdk || true
+        sudo rm -rf /usr/share/man/* || true
+        sudo rm -rf /usr/share/doc/* || true
+        sudo rm -rf /usr/share/icons/* || true 
+
+        sudo rm -rf /var/cache/* || true 
+        
+    - name: Check disk after purge
+      if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
         sudo df -h
-    - name: Setup BTRFS join
+    - name: The Merge
+      if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
-      run: ${{ github.action_path }}/mountpoint-fusion.sh
-    - name: Check disk usage after BTRFS setup
+      run: |
+        ${{ github.action_path }}/mountpoint-fusion.sh
+    - name: Disk usage after merge 
+      if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
         sudo df -h
