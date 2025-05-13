@@ -10,6 +10,7 @@ runs:
       shell: bash
       run: |
         sudo df -h
+        sudo mount
     - name: The Checks
       id: environment-check
       shell: bash
@@ -32,23 +33,20 @@ runs:
       shell: bash
       run: |
         echo "Stop services"
-        for SERVICE in snapd.service mono-xsp4.service rsyslog.service chrony.service php8.1-fpm.service; do
+        for SERVICE in mono-xsp4.service rsyslog.service chrony.service php8.1-fpm.service; do
           sudo systemctl stop "${SERVICE}" || true
         done
 
-        echo "Delete language ecosystems in ${HOME} (~800MB)"
-        for CRUFT in "${HOME}/.rustup" "${HOME}/.cargo" "${HOME}/.dotnet" "${HOME}/snap"; do
+        echo "Delete language ecosystems in ${HOME}"
+        for CRUFT in "${HOME}/.rustup" "${HOME}/.cargo" "${HOME}/.dotnet"; do
           sudo rm -rf "${CRUFT}" || true
         done
 
-        echo "Remove snap (~1GB)"
-        sudo cat <<EOF | sudo tee /etc/apt/preferences.d/nosnap.pref
-        Package: snapd
-        Pin: release a=*
-        Pin-Priority: -10
-        EOF
-        sudo umount --recursive /snap/*/*
-        for CRUFT in /snap /var/snap /var/lib/snapd /usr/lib/snapd; do
+        echo "Remove snap"
+        sudo systemctl stop snapd.service || true
+        sudo systemctl disable snapd.service || true
+        sudo systemctl mask snapd.service || true
+        for CRUFT in /snap /var/snap /var/lib/snapd /usr/lib/snapd "${HOME}/snap"; do
           sudo rm -rf "${CRUFT}" || true
         done
 
@@ -59,15 +57,17 @@ runs:
         docker system prune --all --force || true
 
         echo "Remove unnecessary stuff from /opt (11GB)"
-        for CRUFT IN /opt/hostedtoolcache /opt/microsoft /opt/az /opt/pipx /opt/google /opt/mssql-tools; do
+        for CRUFT in /opt/hostedtoolcache /opt/microsoft /opt/az /opt/pipx /opt/google /opt/mssql-tools; do
           sudo rm -rf "${CRUFT}" || true
         done
         
         echo "Remove /usr/local/bin (>1GB)"
         sudo rm -rf /usr/local/bin/* || true
-        echo "Remove /usr/local/lib/*" (>10GB)
+
+        echo "Remove /usr/local/lib/* (>10GB)"
         sudo rm -rf /usr/local/lib/* || true
-        echo "Remove /usr/local/share/*" (~2GB)
+
+        echo "Remove /usr/local/share/* (~2GB)"
         sudo rm -rf /usr/local/share/* || true
 
         echo "Remove ghcup (~5.5GB)"

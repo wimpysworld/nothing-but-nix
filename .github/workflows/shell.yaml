@@ -1,18 +1,18 @@
-name: Debug shell
+name: Shell
 on:
   workflow_dispatch:
 jobs:
   debug-shell:
-    name: "Open debug shell to inspect the disk usage"
+    name: Shell
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout this action
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: ./.github/actions/this
-      - name: Run this action
+      - name: Run
         uses: ./.github/actions/this
       - name: Install ncdu
-        run: sudo apt install -y ncdu
-      - name: Setup shell stuff for NCDU and stuff
+        run: sudo apt-get -y install ncdu
+      - name: Shell
         uses: mxschmitt/action-tmate@v3

@@ -1,14 +1,14 @@
-name: Benchmark
+name: Test
 on:
   workflow_dispatch:
 jobs:
-  debug-shell:
-    name: "Open debug shell to inspect the disk usage"
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout this action
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           path: ./.github/actions/this
-      - name: Run this action
+      - name: Run
         uses: ./.github/actions/this
