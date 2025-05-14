@@ -3,6 +3,11 @@ description: 'Removes all the cruft 🪓 from a GitHub Actions runner to make th
 branding:
   icon: 'trash-2'
   color: 'red'
+inputs:
+  hatchet-protocol:
+    description: 'Level of file purging (Holster: none, Cleave: standard, Rampage: aggressive)'
+    required: false
+    default: 'cleave'
 runs:
   using: composite
   steps:
@@ -23,8 +28,31 @@ runs:
         else
           echo "is_supported=true" >> $GITHUB_OUTPUT
         fi
-    - name: The Setup
+    - name: The Hatchet Protocol
+      id: set-hatchet-protocol
       if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        input_protocol="${{ inputs.hatchet-protocol }}"
+        # Convert to lowercase for case-insensitive comparison
+        input_protocol="${input_protocol,,}"
+        
+        # Default to Cleave (1)
+        protocol_level=1
+        
+        if [[ "$input_protocol" == "holster" ]]; then
+          protocol_level=0
+          echo "🪓 Hatchet Protocol: Holster - Keeping the hatchet sheathed, just combining space (Level 0)"
+        elif [[ "$input_protocol" == "rampage" ]]; then
+          protocol_level=2
+          echo "🪓 Hatchet Protocol: Rampage - Relentless, brutal elimination of all bloat (Level 2)"
+        else
+          echo "🪓 Hatchet Protocol: Cleave - Making powerful, decisive cuts to bloated packages (Level 1)"
+        fi
+        
+        echo "level=${protocol_level}" >> $GITHUB_OUTPUT
+    - name: The Setup
+      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 0
       shell: bash
       run: |
         ARCH=$(uname -m)          
@@ -63,21 +91,24 @@ runs:
         path-exclude /usr/share/info/*
         path-exclude /usr/share/man/*
         EOF
-        sudo apt-get -y remove --purge \
-          '^aspnetcore-.*' \
-          azure-cli \
-          '^dotnet-.*' \
-          firefox \
-          google-chrome-stable \
-          google-cloud-sdk \
-          '^llvm-.*' \
-          microsoft-edge-stable \
-          '^mysql-.*' \
-          powershell
-        sudo apt-get -y autoremove --purge
-        sudo apt-get -y clean
+
+        protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
+        if [[ "$protocol_level" -ge 2 ]]; then
+          sudo apt-get -y remove --purge \
+            azure-cli \
+            firefox \
+            google-chrome-stable \
+            google-cloud-sdk \
+            microsoft-edge-stable \
+            powershell
+          sudo apt-get -y autoremove --purge
+        fi
+
+        if [[ "$protocol_level" -ge 1 ]]; then
+          sudo apt-get -y clean
+        fi
     - name: Cleanse docker
-      if: steps.environment-check.outputs.is_supported == 'true'
+      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 1
       shell: bash
       run: |
         for CRUFT in $(docker image ls --format '{{.ID}}'); do
@@ -85,68 +116,121 @@ runs:
         done
         docker system prune --all --force
     - name: Cleanse snap
-      if: steps.environment-check.outputs.is_supported == 'true'
+      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
       shell: bash
       run: |
         sudo systemctl stop snapd.service || true
         sudo systemctl disable snapd.service || true
         sudo systemctl mask snapd.service || true
         sudo umount --recursive /snap/*/* || true
+        sudo rmz -f \
+          /snap \
+          /usr/bin/snap* \
+          /usr/lib/snapd \
+          /var/snap \
+          /var/lib/snapd \
+          "${HOME}/snap"
     - name: The Purge
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        sudo rmz -f \
-          /snap \
-          /var/snap \
-          /var/lib/snapd \
-          /usr/lib/snapd \
-          "${HOME}/snap" \
-          "${HOME}/.rustup" \
-          "${HOME}/.cargo" \
-          "${HOME}/.dotnet" \
-          /usr/local \
-          /opt/hostedtoolcache \
-          /opt/microsoft \
-          /opt/az \
-          /opt/pipx* \
-          /opt/google \
-          /opt/mssql-tools \
-          /usr/bin/java* \
-          /usr/bin/mono* \
-          /usr/lib/heroku* \
-          /usr/lib/jvm \
-          /usr/lib/mecab \
-          /usr/lib/*mono* \
-          /usr/lib/R \
-          /usr/lib/ruby \
-          /usr/share/apache-maven* \
-          /usr/share/az* \
-          /usr/share/doc/* \
-          /usr/share/fonts/* \
-          /usr/share/gradle* \
-          /usr/share/icons/* \
-          /usr/share/java \
-          /usr/share/kotlin* \
-          /usr/share/man/* \
-          /usr/share/mecab \
-          /usr/share/miniconda \
-          /usr/share/postgresql* \
-          /usr/share/R \
-          /usr/share/ri \
-          /usr/share/sbt \
-          /usr/share/swift* \
-          /usr/share/texinfo \
-          /var/lib/gems \
-          /var/lib/mecab \
-          /var/lib/postgresql*
-        sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
+        protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
+        if [[ "$protocol_level" -ge 1 ]]; then
+          sudo rmz -f \
+            "${HOME}/.rustup" \
+            "${HOME}/.cargo" \
+            "${HOME}/.dotnet" \
+            /usr/local \
+            /opt/hostedtoolcache \
+            /opt/microsoft \
+            /opt/az \
+            /opt/pipx* \
+            /opt/google \
+            /opt/mssql-tools
+          sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
+        fi
+
+        if [[ "$protocol_level" -ge 2 ]]; then
+          sudo rmz -f \
+            /usr/bin/buildah \
+            /usr/bin/docker* \
+            /usr/bin/java* \
+            /usr/bin/kotlin* \
+            /usr/bin/kubectl \
+            /usr/bin/mono* \
+            /usr/bin/my* \
+            /usr/bin/pedump \
+            /usr/bin/perror \
+            /usr/bin/php* \
+            /usr/bin/podman* \
+            /usr/bin/ruby* \
+            /usr/bin/tcpdump \
+            /usr/bin/skopeo \
+            /usr/bin/vim* \
+            /usr/bin/x86_64-* \
+            /usr/lib/*-linux-gnu/libLLVM* \
+            /usr/lib/*-linux-gnu/libclang* \
+            /usr/lib/*-linux-gnu/liblldb* \
+            /usr/lib/*-linux-gnu/libmysql* \
+            /usr/lib/cgi-bin \
+            /usr/lib/dotnet \
+            /usr/lib/firefox \
+            /usr/lib/gcc \
+            /usr/lib/google-cloud-sdk \
+            /usr/lib/heroku* \
+            /usr/lib/jvm \
+            /usr/lib/llvm* \
+            /usr/lib/mecab \
+            /usr/lib/*mono* \
+            /usr/lib/mysql \
+            /usr/lib/php \
+            /usr/lib/postgresql \
+            /usr/lib/R \
+            /usr/lib/ruby \
+            /usr/sbin/mysql* \
+            /usr/sbin/php* \
+            /usr/sbin/nginx* \
+            /usr/share/apache* \
+            /usr/share/az* \
+            /usr/share/doc/* \
+            /usr/share/dotnet \
+            /usr/share/fonts/* \
+            /usr/share/fwupd \
+            /usr/share/google-cloud-sdk \
+            /usr/share/gradle* \
+            /usr/share/icons/* \
+            /usr/share/info/* \
+            /usr/share/java \
+            /usr/share/kotlin* \
+            /usr/share/man/* \
+            /usr/share/mecab \
+            /usr/share/miniconda \
+            /usr/share/mysql \
+            /usr/share/postgresql \
+            /usr/share/php* \
+            /usr/share/python-babel-localedata \
+            /usr/share/python-wheels \
+            /usr/share/R \
+            /usr/share/ri \
+            /usr/share/sbt \
+            /usr/share/swift \
+            /usr/share/swig* \
+            /usr/share/tcltk \
+            /usr/share/texinfo \
+            /usr/share/vim \
+            /var/lib/gems \
+            /var/lib/mecab \
+            /var/lib/mysql \
+            /var/lib/podman \
+            /var/lib/postgresql \
+            /var/lib/ubuntu-advantage
+        fi
     - name: The Disks
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        loops=()
         # Create loop devices
+        loops=()
         for ROOT in / /mnt/; do
           free_space=$(df -m --output=avail "${ROOT}" | tail -n 1 | tr -d ' ')
           echo "Free space of "${ROOT}": ${free_space}MB"
