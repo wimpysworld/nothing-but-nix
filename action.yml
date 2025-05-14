@@ -6,10 +6,6 @@ branding:
 runs:
   using: composite
   steps:
-    - name: Disks before 
-      shell: bash
-      run: |
-        sudo df -h
     - name: The Checks
       id: environment-check
       shell: bash
@@ -27,7 +23,8 @@ runs:
         else
           echo "is_supported=true" >> $GITHUB_OUTPUT
         fi
-    - name: The setup
+        sudo df -h
+    - name: The Setup
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
@@ -56,103 +53,98 @@ runs:
         chmod +x rmz
         sudo mv rmz /usr/bin/rmz
         rmz --version
-    - name: The Purge
+    - name: Cleanse apt
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        echo "Remove docker images"
+        sudo apt-get -y autoremove
+        sudo apt-get -y clean
+    - name: Cleanse docker
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
         for CRUFT in $(docker image ls --format '{{.ID}}'); do
           docker rmi --force "${CRUFT}" || true
         done
         docker system prune --all --force
-        
-        echo "Remove snap"
+    - name: Cleanse snap
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
         sudo systemctl stop snapd.service || true
         sudo systemctl disable snapd.service || true
         sudo systemctl mask snapd.service || true
         sudo umount --recursive /snap/*/* || true
-        for CRUFT in /snap /var/snap /var/lib/snapd /usr/lib/snapd "${HOME}/snap"; do
-          sudo rmz -f ${CRUFT}
-        done
-
-        echo "Cleanse apt"
-        sudo apt-get -y autoremove
-        sudo apt-get -y clean
-
-        echo "Cleanse ${HOME}"
-        for CRUFT in "${HOME}/.rustup" "${HOME}/.cargo" "${HOME}/.dotnet"; do
-          sudo rmz -f "${CRUFT}"
-        done
-
-        echo "Remove /usr/local"
-        sudo rmz -f /usr/local
-        echo "Recreate /usr/local"
+    - name: The Purge
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        sudo rmz -f \
+          /snap \
+          /var/snap \
+          /var/lib/snapd \
+          /usr/lib/snapd \
+          "${HOME}/snap" \
+          "${HOME}/.rustup" \
+          "${HOME}/.cargo" \
+          "${HOME}/.dotnet" \
+          /usr/local \
+          /opt/hostedtoolcache \
+          /opt/microsoft \
+          /opt/az \
+          /opt/pipx* \
+          /opt/google \
+          /opt/mssql-tools \
+          /usr/bin/chrome* \
+          /usr/bin/firefox* \
+          /usr/bin/java* \
+          /usr/bin/mono* \
+          /usr/bin/mysql* \
+          /usr/lib/dotnet* \
+          /usr/lib/firefox* \
+          /usr/lib/google-cloud-sdk \
+          /usr/lib/heroku* \
+          /usr/lib/jvm \
+          /usr/lib/mecab \
+          /usr/lib/*mono* \
+          /usr/lib/R \
+          /usr/lib/ruby \
+          /usr/lib/php \
+          /usr/bin/php* \
+          /usr/sbin/php* \
+          /usr/share/apache-maven* \
+          /usr/share/az* \
+          /usr/share/doc/* \
+          /usr/share/dotnet* \
+          /usr/share/fonts/* \
+          /usr/share/google-cloud-sdk \
+          /usr/share/gradle* \
+          /usr/share/icons/* \
+          /usr/share/java \
+          /usr/share/kotlin* \
+          /usr/share/man/* \
+          /usr/share/mecab \
+          /usr/share/miniconda \
+          /usr/share/mysql* \
+          /usr/share/php* \
+          /usr/share/postgresql* \
+          /usr/share/R \
+          /usr/share/ri \
+          /usr/share/sbt \
+          /usr/share/swift* \
+          /usr/share/texinfo \
+          /var/lib/gems \
+          /var/lib/mecab \
+          /var/lib/mysql* \
+          /var/lib/php* \
+          /var/lib/postgresql*
         sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
-        
-        echo "Cleanse /opt"
-        sudo rmz -f /opt/hostedtoolcache
-        sudo rmz -f /opt/microsoft
-        sudo rmz -f /opt/az
-        sudo rmz -f /opt/pipx*
-        sudo rmz -f /opt/google
-        sudo rmz -f /opt/mssql-tools
-
-        echo "Remove executables"
-        sudo rmz -f /usr/bin/chrome*
-        sudo rmz -f /usr/bin/firefox*
-        sudo rmz -f /usr/bin/java*
-        sudo rmz -f /usr/bin/mono*
-        sudo rmz -f /usr/bin/mysql*
-        sudo rmz -f /usr/bin/php*
-        sudo rmz -f /usr/sbin/php*
-
-        echo "Remove libraries"
-        sudo rmz -f /usr/lib/dotnet*
-        sudo rmz -f /usr/lib/firefox*
-        sudo rmz -f /usr/lib/google-cloud-sdk
-        sudo rmz -f /usr/lib/heroku*
-        sudo rmz -f /usr/lib/jvm
-        sudo rmz -f /usr/lib/mecab
-        sudo rmz -f /usr/lib/*mono*
-        sudo rmz -f /usr/lib/R
-        sudo rmz -f /usr/lib/ruby
-        sudo rmz -f /usr/lib/php
-
-        echo "Cleanse /usr/share"
-        sudo rmz -f /usr/share/apache-maven*
-        sudo rmz -f /usr/share/az*
-        sudo rmz -f /usr/share/doc/*
-        sudo rmz -f /usr/share/dotnet*
-        sudo rmz -f /usr/share/fonts/*
-        sudo rmz -f /usr/share/google-cloud-sdk
-        sudo rmz -f /usr/share/gradle*
-        sudo rmz -f /usr/share/icons/*
-        sudo rmz -f /usr/share/java
-        sudo rmz -f /usr/share/kotlin*
-        sudo rmz -f /usr/share/man/*
-        sudo rmz -f /usr/share/mecab
-        sudo rmz -f /usr/share/miniconda
-        sudo rmz -f /usr/share/mysql*
-        sudo rmz -f /usr/share/php*
-        sudo rmz -f /usr/share/postgresql*
-        sudo rmz -f /usr/share/R
-        sudo rmz -f /usr/share/ri
-        sudo rmz -f /usr/share/sbt
-        sudo rmz -f /usr/share/swift*
-        sudo rmz -f /usr/share/texinfo
-
-        echo "Cleanse /var/lib"
-        sudo rmz -f /var/lib/gems
-        sudo rmz -f /var/lib/mecab
-        sudo rmz -f /var/lib/mysql*
-        sudo rmz -f /var/lib/php*
-        sudo rmz -f /var/lib/postgresql*
-    - name: The Merge
+    - name: The Disks
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
         loops=()
-        # Create loop devices for the free space in / and /mnt
+        # Create loop devices
         for ROOT in / /mnt/; do
           free_space=$(df -m --output=avail "${ROOT}" | tail -n 1 | tr -d ' ')
           echo "Free space of "${ROOT}": ${free_space}MB"
@@ -163,17 +155,14 @@ runs:
           fi
         done
           
-        # Create btrfs filesystem
+        # Create filesystem
         sudo mkfs.btrfs -L nix -d raid0 -m raid0 -O no-holes "${loops[@]}"
         sudo btrfs device scan
         sudo btrfs filesystem show
         sudo file "${loops[@]}"
 
-        # Create mount point and mount the filesystem
+        # Mount filesystem
         sudo mkdir -p /nix
         sudo mount LABEL=nix /nix -o noatime,nodatacow,nobarrier,compress=zstd:1,space_cache=v2,ssd,commit=120,discard=async
-    - name: Disk after
-      if: steps.environment-check.outputs.is_supported == 'true'
-      shell: bash
-      run: |
         sudo df -h
+        
