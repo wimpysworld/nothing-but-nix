@@ -1,26 +1,27 @@
-name: Test
+name: Test 🧪
 on:
   workflow_dispatch:
 jobs:
   test-ubuntu:
-    name: Test ${{ matrix.os }}
+    name: Test ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
+        hatchet-protocol: [holster, cleave, rampage]
       fail-fast: false
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           path: ./.github/actions/this
-      - name: Run
+      - name: Nothing but Nix
         uses: ./.github/actions/this
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          hatchet-protocol: ${{ matrix.hatchet-protocol }}
+      - uses: DeterminateSystems/nix-installer-action@main
         with:
           determinate: true
       - name: Run Nix

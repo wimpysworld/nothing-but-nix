@@ -1,4 +1,4 @@
-name: Debug
+name: Debug 🐛
 on:
   workflow_dispatch:
 jobs:
@@ -13,20 +13,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           path: ./.github/actions/this
-      - name: Run
+      - name: Nothing but Nix
         uses: ./.github/actions/this
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
         with:
-          determinate: true
-      - name: Run Nix
-        run: |
-          nix --version
-          echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
+          hatchet-protocol: rampage
       - name: Debug
         run: |
           sudo du -csh /opt/*
