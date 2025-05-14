@@ -156,13 +156,13 @@ runs:
         done
           
         # Create filesystem
-        sudo mkfs.btrfs -L nix -d raid0 -m raid0 -O no-holes "${loops[@]}"
+        sudo mkfs.btrfs -L nix -d raid0 -m raid0 "${loops[@]}"
         sudo btrfs device scan
         sudo btrfs filesystem show
         sudo file "${loops[@]}"
 
         # Mount filesystem
         sudo mkdir -p /nix
-        sudo mount LABEL=nix /nix -o noatime,nodatacow,nobarrier,compress=zstd:1,space_cache=v2,ssd,commit=120,discard=async
+        sudo mount LABEL=nix /nix -o noatime,nobarrier,compress=zstd:1,space_cache=v2,ssd,commit=120,discard=async
         sudo df -h
         
