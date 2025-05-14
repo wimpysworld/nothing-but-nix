@@ -37,22 +37,27 @@ runs:
         # Convert to lowercase for case-insensitive comparison
         input_protocol="${input_protocol,,}"
         
-        # Default to Cleave (1)
-        protocol_level=1
-        
-        if [[ "$input_protocol" == "holster" ]]; then
-          protocol_level=0
-          echo "🪓 Hatchet Protocol: Holster - Keeping the hatchet sheathed, just combining space (Level 0)"
-        elif [[ "$input_protocol" == "rampage" ]]; then
-          protocol_level=2
-          echo "🪓 Hatchet Protocol: Rampage - Relentless, brutal elimination of all bloat (Level 2)"
-        else
-          echo "🪓 Hatchet Protocol: Cleave - Making powerful, decisive cuts to bloated packages (Level 1)"
-        fi
-        
+        case "$input_protocol" in
+          "holster")
+            echo "🪓 Hatchet Protocol: Holster - Keep the hatchet sheathed, use space from /mnt (Level 0)"
+            protocol_level=0;;
+          "carve")
+            echo "🪓 Hatchet Protocol: Carve - Craft and combine free space from / and /mnt (Level 1)"
+            protocol_level=1;;
+          "cleave")
+            echo "🪓 Hatchet Protocol: Cleave - Make powerful, decisive cuts to large packages (Level 2)"
+            protocol_level=2;;
+          "rampage")
+            echo "🪓 Hatchet Protocol: Rampage - Relentless, brutal elimination of all bloat (Level 3)"
+            protocol_level=3;;
+          *)
+            echo "🪓 Hatchet Protocol: Cleave - Make powerful, decisive cuts to large packages (Level 2)"
+            protocol_level=2;;
+        esac
+
         echo "level=${protocol_level}" >> $GITHUB_OUTPUT
     - name: The Setup
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 0
+      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 1
       shell: bash
       run: |
         ARCH=$(uname -m)          
@@ -80,62 +85,130 @@ runs:
         chmod +x rmz
         sudo mv rmz /usr/bin/rmz
         rmz --version
-    - name: Cleanse apt
+    - name: The Volume
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        sudo tee /etc/dpkg/dpkg.cfg.d/01_nocruft > /dev/null << 'EOF'
+        # Create initial loop device using Holster approach (minimal space reclamation)
+        
+        free_space=$(df -m --output=avail /mnt | tail -n 1 | tr -d ' ')
+        echo "Initial free space of /mnt: ${free_space}MB"
+        loop_dev=$(sudo losetup --find)
+        loop_num=${loop_dev##*/loop}        
+        if sudo fallocate -l $((free_space - 1024))M "/mnt/disk${loop_num}.img"; then  
+          sudo losetup ${loop_dev} "/mnt/disk${loop_num}.img"
+        fi
+          
+        # Create filesystem
+        sudo mkfs.btrfs -L nix -d raid0 -m raid0 --nodiscard "${loop_dev}"
+        sudo btrfs device scan
+        sudo btrfs filesystem show
+
+        # Mount filesystem
+        sudo mkdir -p /nix
+        sudo mount LABEL=nix /nix -o noatime,nobarrier,compress=zstd:1,space_cache=v2,commit=120
+        sudo df -h
+        
+        # Create a directory to store expansion state
+        mkdir -p "${HOME}/.expansion"
+        echo "Initial volume created" > "${HOME}/.expansion/holster_done"
+    - name: The Purge
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        cat > /tmp/expand_nix_volume.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
+        expansion_dir="${HOME}/.expansion"
+        
+        function add_expansion_disk() {
+          # Check for additional free space after purging
+          free_space=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
+          echo "Free space of / after purge: ${free_space}MB"
+
+          # Create additional disk if at least 4GB free space exists
+          if [ $free_space -gt 4096 ]; then
+            # Calculate the size of the expansion disk, reserving 2GB
+            disk_size=$((free_space - 2048))
+            echo "Creating expansion disk of ${disk_size}MB in /"
+            # Create expansion disk image
+            loop_dev=$(sudo losetup --find)
+            loop_num=${loop_dev##*/loop}
+            if sudo fallocate -l ${disk_size}M "/disk${loop_num}.img"; then
+              sudo losetup ${loop_dev} "/disk${loop_num}.img"
+              
+              # Add the new device to the pool
+              sudo btrfs device add ${loop_dev} /nix
+              echo "Added expansion disk "/disk${loop_num}.img" (${loop_dev}, ${disk_size}MB) to /nix pool" > $expansion_dir/expansion_done
+              
+              # Balance the filesystem to use the new space
+              sudo btrfs balance start -dusage=50 /nix
+              sudo btrfs filesystem show
+              sudo df -h
+            fi
+          fi
+        }
+
+        # If carve is selected, claim space from / now
+        if [[ "$protocol_level" -eq 1 ]]; then
+          echo "Disk space has been carved out" > $expansion_dir/carve_done
+          add_expansion_disk
+        fi
+
+        # Cleanse apt
+        if [[ "$protocol_level" -ge 2 ]]; then
+          sudo tee /etc/dpkg/dpkg.cfg.d/01_nocruft > /dev/null << 'APTCFG'
         path-exclude /usr/share/doc/*
         path-exclude /usr/share/fonts/*
         path-exclude /usr/share/icons/*
         path-exclude /usr/share/info/*
         path-exclude /usr/share/man/*
-        EOF
+        APTCFG
 
-        protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
-        if [[ "$protocol_level" -ge 2 ]]; then
-          sudo apt-get -y remove --purge \
-            azure-cli \
-            firefox \
-            google-chrome-stable \
-            google-cloud-sdk \
-            microsoft-edge-stable \
-            powershell
-          sudo apt-get -y autoremove --purge
-        fi
+          if [[ "$protocol_level" -ge 3 ]]; then
+            sudo apt-get -y remove --purge \
+              azure-cli \
+              firefox \
+              google-chrome-stable \
+              google-cloud-sdk \
+              microsoft-edge-stable \
+              powershell
+            sudo apt-get -y autoremove --purge
+          fi
 
-        if [[ "$protocol_level" -ge 1 ]]; then
           sudo apt-get -y clean
+          echo "Cleanse apt complete" > $expansion_dir/apt_done
         fi
-    - name: Cleanse docker
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 1
-      shell: bash
-      run: |
-        for CRUFT in $(docker image ls --format '{{.ID}}'); do
-          docker rmi --force "${CRUFT}" || true
-        done
-        docker system prune --all --force
-    - name: Cleanse snap
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
-      shell: bash
-      run: |
-        sudo systemctl stop snapd.service || true
-        sudo systemctl disable snapd.service || true
-        sudo systemctl mask snapd.service || true
-        sudo umount --recursive /snap/*/* || true
-        sudo rmz -f \
-          /snap \
-          /usr/bin/snap* \
-          /usr/lib/snapd \
-          /var/snap \
-          /var/lib/snapd \
-          "${HOME}/snap"
-    - name: The Purge
-      if: steps.environment-check.outputs.is_supported == 'true'
-      shell: bash
-      run: |
-        protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
-        if [[ "$protocol_level" -ge 1 ]]; then
+        
+        # Cleanse docker
+        if [[ "$protocol_level" -ge 2 ]]; then
+          for CRUFT in $(docker image ls --format '{{.ID}}'); do
+            docker rmi --force "${CRUFT}" || true
+          done
+          docker system prune --all --force
+          echo "Cleanse docker complete" > $expansion_dir/docker_done
+        fi
+        
+        # Cleanse snap
+        if [[ "$protocol_level" -ge 3 ]]; then
+          sudo systemctl stop snapd.service || true
+          sudo systemctl disable snapd.service || true
+          sudo systemctl mask snapd.service || true
+          sudo umount --recursive /snap/*/* || true
+          sudo rmz -f \
+            /snap \
+            /usr/bin/snap* \
+            /usr/lib/snapd \
+            /var/snap \
+            /var/lib/snapd \
+            "${HOME}/snap"
+          echo "Cleanse snap complete" > $expansion_dir/snap_done
+        fi
+        
+        # Cleave
+        if [[ "$protocol_level" -ge 2 ]]; then
           sudo rmz -f \
             "${HOME}/.rustup" \
             "${HOME}/.cargo" \
@@ -148,9 +221,11 @@ runs:
             /opt/google \
             /opt/mssql-tools
           sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
+          echo "Cleave complete" > $expansion_dir/cleave_done
         fi
-
-        if [[ "$protocol_level" -ge 2 ]]; then
+        
+        # Rampage
+        if [[ "$protocol_level" -ge 3 ]]; then
           sudo rmz -f \
             /usr/bin/buildah \
             /usr/bin/docker* \
@@ -224,30 +299,22 @@ runs:
             /var/lib/podman \
             /var/lib/postgresql \
             /var/lib/ubuntu-advantage
+          echo "Rampage complete" > $expansion_dir/rampage_done
         fi
-    - name: The Disks
-      if: steps.environment-check.outputs.is_supported == 'true'
-      shell: bash
-      run: |
-        # Create loop devices
-        loops=()
-        for ROOT in / /mnt/; do
-          free_space=$(df -m --output=avail "${ROOT}" | tail -n 1 | tr -d ' ')
-          echo "Free space of "${ROOT}": ${free_space}MB"
-          if sudo fallocate -l $((free_space - 1024))M "${ROOT}"disk.img; then
-            loop_dev=$(sudo losetup --find)
-            sudo losetup ${loop_dev} "${ROOT}"disk.img
-            loops+=(${loop_dev})
-          fi
-        done
-          
-        # Create filesystem
-        sudo mkfs.btrfs -L nix -d raid0 -m raid0 "${loops[@]}"
-        sudo btrfs device scan
-        sudo btrfs filesystem show
 
-        # Mount filesystem
-        sudo mkdir -p /nix
-        sudo mount LABEL=nix /nix -o noatime,nobarrier,compress=zstd:1,space_cache=v2,ssd,commit=120,discard=async
-        sudo df -h
+        # Claim the space from / for purging
+        if [[ "$protocol_level" -ge 2 ]]; then
+          echo "The Purge Is Complete!" > $expansion_dir/purge_done
+          add_expansion_disk
+        fi
+        EOF
+
+        # Make script executable and run in background
+        chmod +x /tmp/expand_nix_volume.sh
+        /tmp/expand_nix_volume.sh > ${HOME}/.expansion/expansion.log 2>&1 &
+        echo "📈 Background space expansion started. /nix will grow as space becomes available."
         
+        # Wait for the expand_nix_volume.sh process to finish
+        while wait -n; do
+          sleep 0.5
+        done

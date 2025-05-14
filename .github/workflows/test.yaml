@@ -8,7 +8,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
-        hatchet-protocol: [holster, cleave, rampage]
+        hatchet-protocol: [holster, carve, cleave, rampage]
       fail-fast: false
     permissions:
       contents: read
@@ -28,3 +28,28 @@ jobs:
         run: |
           nix --version
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
+      - name: Status
+        run: |
+          if [ -f ${HOME}/.expansion/expansion.log ]; then
+            cat ${HOME}/.expansion/expansion.log
+          fi
+          ls -ltr ${HOME}/.expansion/*_done
+          all_disks=()
+  
+          # Check for disks in /mnt directory
+          mnt_disks=(/mnt/disk*.img)
+          if [[ -e "${mnt_disks[0]}" ]]; then
+            all_disks+=("${mnt_disks[@]}")
+          fi
+
+          # Check for disks in / directory
+          root_disks=(/disk*.img)
+          if [[ -e "${root_disks[0]}" ]]; then
+            all_disks+=("${root_disks[@]}")
+          fi        
+          
+          echo "Found ${#all_disks[@]} disk image(s):"
+          for disk in "${all_disks[@]}"; do
+            echo "- $disk ($(du -h "$disk" | cut -f1))"
+          done
+          

@@ -1,48 +1,11 @@
-# Nothing but Nix ❄️
-**Slash the bloat. Maximize the space. Run [Nix](https://zero-to-nix.com/concepts/nix/) with confidence on GitHub Actions.**
-- Adapted from <https://github.com/lucasew/action-i-only-care-about-nix>.
+# Nothing but Nix
 
-## What does it do?
+**Transform your GitHub Actions runner into a [Nix](https://zero-to-nix.com/concepts/nix/) ❄️ powerhouse by ruthlessly slashing pre-installed bloat.**
 
-This action **brutally purges** unnecessary software from GitHub Actions runners to create a large volume for the `/nix` store:
+GitHub Actions runners come with meager disk space for Nix - a mere ~20GB.
+*Nothing but Nix* **brutally purges** unnecessary software, giving you **65GB to 130GB** for your Nix store! 💪
 
-- ️🌨️ **Creates a dedicated `/nix` volume** by merging free space from multiple partitions into one large, optimized filesystem
-  - On the standard free-tier GitHub runner the **`/nix` volume will be 85GB to 130GB** ✨ depending on the *Hatchet Protocol* selected
-- ️🗑️ **Reclaim Gigabytes** of disk space by removing language runtimes, Docker images, package managers, libraries and more...
-- ⚡ **Lightning-fast cleanup** using `rmz`, a high-performance alternative to `rm` that dramatically reduces preparation time
-
-### About `rmz`
-
-Under the hood, *Nothing but Nix* utilizes `rmz` from the [Fast Unix Commands (FUC)](https://github.com/SUPERCILEX/fuc) project, which:
-
-- Delivers **significantly faster** file removal operations than standard `rm`
-- Uses a smart scheduling algorithm that optimizes directory deletion through atomic reference counting
-- Makes file cleanup operations run in parallel where possible
-- Helps *Nothing but Nix* **reclaim disk space in seconds rather than minutes**
-
-## Why do I need *Nothing but Nix*
-
-GitHub Actions runners come packed with pre-installed tools you'll likely never use in your Nix workflow. 
-The **typical space available in a standard GitHub runner for `/nix` is 20GB**. We deserve better 😁
-This action:
-
-- 🗄️ **Makes a large `/nix` volume** that prevents *"no space left on device"* errors during Nix builds
-- ️⏱️ **Saves precious CI time** with optimised file removal operations when compared to similar GitHub actions
-
-```
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/root        72G  5.6G   67G   8% /
-tmpfs           7.9G   84K  7.9G   1% /dev/shm
-tmpfs           3.2G  1.1M  3.2G   1% /run
-tmpfs           5.0M     0  5.0M   0% /run/lock
-/dev/sdb16      881M   60M  760M   8% /boot
-/dev/sdb15      105M  6.2M   99M   6% /boot/efi
-/dev/sda1        74G  4.1G   66G   6% /mnt
-tmpfs           1.6G   12K  1.6G   1% /run/user/1001
-/dev/loop0      130G  5.7M  129G   1% /nix
-```
-
-## How to use it
+## Usage
 
 Add this action **before** installing Nix in your workflow:
 
@@ -58,41 +21,89 @@ jobs:
       - uses: wimpysworld/nothing-but-nix@main
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
       - name: Run Nix
         run: |
           nix --version
           # Your Nix-powered steps here...
 ```
 
-### Hatchet Protocol 🪓
+## The Problem: Making Room for Nix to Thrive 🌱
 
-You can control the file purging aggression using the `hatchet-protocol` input:
+Standard GitHub Actions runners are stuffed with *"bloatware"* you'll never use in a Nix workflow:
+
+- 🌍 Web browsers. Lots of them. Gotta have 'em all!
+- 🐳 Docker images consuming gigabytes of precious disk space
+- 💻 Unnecessary language runtimes (.NET, Ruby, PHP, Java...)
+- 📦 Package managers gathering digital dust
+- 📚 Documentation no one will ever read
+
+This bloat leaves only ~20GB for your Nix store - barely enough for serious Nix builds! 😞
+
+## The Solution: Nothing but Nix ️❄️
+
+**Nothing but Nix** takes a scorched-earth approach to GitHub Actions runners and mercilessly reclaims disk space using a two-phase attack:
+
+1. **Initial Slash:** Instantly creates a large `/nix` volume (~65GB) by claiming free space from `/mnt`
+2. **Background Rampage:** While your workflow continues, we ruthlessly eliminate unnecessary software to expand your `/nix` volume up to ~130GB
+   - Web browsers? Nope ⛔
+   - Docker images? Gone 🗑️
+   - Language runtimes? Obliterated 💥
+   - Package managers? Annihilated 💣
+   - Documentation? Vaporized ️👻
+
+The file system purge is powered by `rmz` (from the [Fast Unix Commands (FUC)](https://github.com/SUPERCILEX/fuc) project) - a high-performance alternative to `rm` that makes space reclamation blazing fast! ⚡
+   - Outperforms standard `rm` by an order of magnitude
+   - Parallel-processes deletions for maximum efficiency
+   - **Reclaims disk space in seconds rather than minutes!** ️⏱️
+
+The end result? A GitHub Actions runner with **65GB to 130GB** of Nix-ready space! 😁
+
+### Dynamic Volume Growth
+
+Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically:
+
+1. **Initial Volume Creation (~1 second):**
+   - Creates a loop device from free space on `/mnt`
+   - Sets up a BTRFS filesystem in RAID0 configuration
+   - Mounts with compression and performance tuning
+   - Provides an 65GB `/nix` immediately, even before the purge begins
+
+2. **Background Expansion (30-60 seconds):**
+   - Executes purging operations based on your selected *Hatchet Protocol*
+   - Monitors for newly freed space as bloat is eliminated
+   - Dynamically adds an expansion disk to the `/nix` volume
+   - Rebalances the filesystem to incorporate new space
+
+The `/nix` volume automatically **grows during workflow execution** 🎩🪄
+
+### Choose Your Weapon: The Hatchet Protocol 🪓
+
+Control the level of annihilation 💥 with the `hatchet-protocol` input:
 
 ```yaml
 - uses: wimpysworld/nothing-but-nix@main
   with:
-    hatchet-protocol: 'cleave'  # Options: holster, cleave (default), rampage
+    hatchet-protocol: 'cleave'  # Options: holster, carve, cleave (default), rampage
 ```
 
 #### Protocol Comparison
 
-| Name    | Description                                     | Cleanse apt | Cleanse docker | Cleanse snap | Filesystems purged  | Preparation time | `/nix` |
-|---------|-------------------------------------------------|-------------|----------------|--------------|---------------------|------------------|--------|
-| Holster | Keeps the hatchet sheathed, just combines space | No          | No             | No           | No                  | 1 second         | ~85GB  |
-| Cleave  | Makes powerful, decisive cuts to large packages | Minimal     | Yes            | No           | /opt and /usr/local | ~30 seconds      | ~120GB |
-| Rampage | Relentless, brutal elimination of all bloat     | Aggressive  | Yes            | Yes          | Muahahaha!          | ~60 seconds      | ~130GB |
+| Protocol | `/nix` | Description                                      | Cleanse apt | Cleanse docker | Cleanse snap | Filesystems purged      |
+|----------|--------|--------------------------------------------------|-------------|----------------|--------------|-------------------------|
+| Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt` | No          | No             | No           | No                      |
+| Carve    | ~85GB  | Craft and combine free space from `/` and `/mnt` | No          | No             | No           | No                      |
+| Cleave   | ~120GB | Make powerful, decisive cuts to large packages   | Minimal     | Yes            | No           | `/opt` and `/usr/local` |
+| Rampage  | ~130GB | Relentless, brutal elimination of all bloat      | Aggressive  | Yes            | Yes          | Muahahaha! 🔥🌎         |
 
-*The sizes of `/nix` quoted above are based on the standard free-tier GitHub runners.*
-
-- **Holster** when you need to optimise for reduced CI runtime
-- **Cleave** (default) for a good balance of CI runtime space and preservation of functional underlying tools.
-- **Rampage** when you need the absolute maximum Nix store space and don't care how damaged the pre-installed tools become `#nix-is-life`
+Choose wisely:
+- **Holster** when you need the runner's tools to remain fully functional
+- **Carve** preserve functional runner tooling but claim all free space for Nix
+- **Cleave** (default) for a good balance of space and functionality
+- **Rampage** when you need maximum Nix space and don't care what breaks `#nix-is-life`
 
 ## Requirements
 
 - Only supports **Ubuntu** GitHub Actions runners
 - Must run **before** Nix is installed
 
-Now go build something amazing with all that extra space! ❄️
+Now go build something amazing with all that glorious Nix space! ❄️
