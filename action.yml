@@ -23,7 +23,6 @@ runs:
         else
           echo "is_supported=true" >> $GITHUB_OUTPUT
         fi
-        sudo df -h
     - name: The Setup
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
@@ -57,7 +56,25 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        sudo apt-get -y autoremove
+        sudo tee /etc/dpkg/dpkg.cfg.d/01_nocruft > /dev/null << 'EOF'
+        path-exclude /usr/share/doc/*
+        path-exclude /usr/share/fonts/*
+        path-exclude /usr/share/icons/*
+        path-exclude /usr/share/info/*
+        path-exclude /usr/share/man/*
+        EOF
+        sudo apt-get -y remove --purge \
+          '^aspnetcore-.*' \
+          azure-cli \
+          '^dotnet-.*' \
+          firefox \
+          google-chrome-stable \
+          google-cloud-sdk \
+          '^llvm-.*' \
+          microsoft-edge-stable \
+          '^mysql-.*' \
+          powershell
+        sudo apt-get -y autoremove --purge
         sudo apt-get -y clean
     - name: Cleanse docker
       if: steps.environment-check.outputs.is_supported == 'true'
@@ -95,29 +112,18 @@ runs:
           /opt/pipx* \
           /opt/google \
           /opt/mssql-tools \
-          /usr/bin/chrome* \
-          /usr/bin/firefox* \
           /usr/bin/java* \
           /usr/bin/mono* \
-          /usr/bin/mysql* \
-          /usr/lib/dotnet* \
-          /usr/lib/firefox* \
-          /usr/lib/google-cloud-sdk \
           /usr/lib/heroku* \
           /usr/lib/jvm \
           /usr/lib/mecab \
           /usr/lib/*mono* \
           /usr/lib/R \
           /usr/lib/ruby \
-          /usr/lib/php \
-          /usr/bin/php* \
-          /usr/sbin/php* \
           /usr/share/apache-maven* \
           /usr/share/az* \
           /usr/share/doc/* \
-          /usr/share/dotnet* \
           /usr/share/fonts/* \
-          /usr/share/google-cloud-sdk \
           /usr/share/gradle* \
           /usr/share/icons/* \
           /usr/share/java \
@@ -125,8 +131,6 @@ runs:
           /usr/share/man/* \
           /usr/share/mecab \
           /usr/share/miniconda \
-          /usr/share/mysql* \
-          /usr/share/php* \
           /usr/share/postgresql* \
           /usr/share/R \
           /usr/share/ri \
@@ -135,8 +139,6 @@ runs:
           /usr/share/texinfo \
           /var/lib/gems \
           /var/lib/mecab \
-          /var/lib/mysql* \
-          /var/lib/php* \
           /var/lib/postgresql*
         sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
     - name: The Disks
@@ -159,7 +161,6 @@ runs:
         sudo mkfs.btrfs -L nix -d raid0 -m raid0 "${loops[@]}"
         sudo btrfs device scan
         sudo btrfs filesystem show
-        sudo file "${loops[@]}"
 
         # Mount filesystem
         sudo mkdir -p /nix
