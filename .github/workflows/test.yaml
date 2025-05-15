@@ -28,8 +28,16 @@ jobs:
         run: |
           nix --version
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
-      - name: Status
+      - name: Wait
         run: |
+          while [ ! -f ${HOME}/.expansion/all_done ]; do
+            sleep 1
+            if [ -f ${HOME}/.expansion/expansion.log ]; then
+              tail -n 1 ${HOME}/.expansion/expansion.log
+            fi
+          done
+      - name: Status
+        run: |          
           if [ -f ${HOME}/.expansion/expansion.log ]; then
             cat ${HOME}/.expansion/expansion.log
           fi
