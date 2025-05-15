@@ -66,7 +66,7 @@ Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically
    - Creates a loop device from free space on `/mnt`
    - Sets up a BTRFS filesystem in RAID0 configuration
    - Mounts with compression and performance tuning
-   - Provides an 65GB `/nix` immediately, even before the purge begins
+   - Provides a 65GB `/nix` immediately, even before the purge begins
 
 2. **Background Expansion (30-60 seconds):**
    - Executes purging operations based on your selected *Hatchet Protocol*
@@ -97,13 +97,13 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 
 Choose wisely:
 - **Holster** when you need the runner's tools to remain fully functional
-- **Carve** preserve functional runner tooling but claim all free space for Nix
-- **Cleave** (default) for a good balance of space and functionality
+- **Carve** to preserve functional runner tooling but claim all free space for Nix
+- **Cleave** (*default*) for a good balance of space and functionality
 - **Rampage** when you need maximum Nix space and don't care what breaks `#nix-is-life`
 
 ## Requirements
 
-- Only supports **Ubuntu** GitHub Actions runners
+- Only supports official **Ubuntu** GitHub Actions runners
 - Must run **before** Nix is installed
 
-Now go build something amazing with all that glorious Nix space! ❄️
+Now go and build something amazing with all that glorious Nix store space! ❄️
