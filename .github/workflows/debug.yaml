@@ -13,17 +13,26 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           path: ./.github/actions/this
-      - name: Nothing but Nix
+      - name: Purge
         uses: ./.github/actions/this
         with:
           hatchet-protocol: rampage
+      - name: Wait
+        run: |
+          while [ ! -f ${HOME}/.expansion/all_done ]; do
+            sleep 1
+            tail -n 1 ${HOME}/.expansion/expansion.log
+          done
       - name: Debug
         run: |
-          sudo du -csh /opt/*
-          sudo du -csh /usr/bin/*
-          sudo du -csh /usr/lib/*
-          sudo du -csh /usr/share/*
-          sudo du -csh /var/lib/*
+          sudo du -csh /opt/* | grep -v "Z 0"
+          sudo du -csh /usr/bin/* | grep -v "Z 0"
+          sudo du -csh /usr/lib/* | grep -v "Z 0"
+          sudo du -csh /usr/share/* | grep -v "Z 0"
+          sudo du -csh /var/lib/* | grep -v "Z 0"
+          dpkg-query -W -f='${Installed-Size;8}\t${Status;1}\t${Package}\n' | grep -v "\sd\s" | sort -n | cut -f1,3-
+          sudo df -h

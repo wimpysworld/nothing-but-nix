@@ -157,31 +157,6 @@ runs:
           add_expansion_disk
         fi
 
-        # Cleanse apt
-        if [[ "$protocol_level" -ge 2 ]]; then
-          sudo tee /etc/dpkg/dpkg.cfg.d/01_nocruft > /dev/null << 'APTCFG'
-        path-exclude /usr/share/doc/*
-        path-exclude /usr/share/fonts/*
-        path-exclude /usr/share/icons/*
-        path-exclude /usr/share/info/*
-        path-exclude /usr/share/man/*
-        APTCFG
-
-          if [[ "$protocol_level" -ge 3 ]]; then
-            sudo apt-get -y remove --purge \
-              azure-cli \
-              firefox \
-              google-chrome-stable \
-              google-cloud-sdk \
-              microsoft-edge-stable \
-              powershell
-            sudo apt-get -y autoremove --purge
-          fi
-
-          sudo apt-get -y clean
-          echo "Cleanse apt complete" > $expansion_dir/apt_done
-        fi
-        
         # Cleanse docker
         if [[ "$protocol_level" -ge 2 ]]; then
           for CRUFT in $(docker image ls --format '{{.ID}}'); do
@@ -190,7 +165,7 @@ runs:
           docker system prune --all --force
           echo "Cleanse docker complete" > $expansion_dir/docker_done
         fi
-        
+
         # Cleanse snap
         if [[ "$protocol_level" -ge 3 ]]; then
           sudo systemctl stop snapd.service || true
@@ -206,6 +181,76 @@ runs:
             "${HOME}/snap"
           echo "Cleanse snap complete" > $expansion_dir/snap_done
         fi
+
+        # Cleanse apt
+        if [[ "$protocol_level" -ge 2 ]]; then
+          sudo tee /etc/dpkg/dpkg.cfg.d/01_nocruft > /dev/null << 'APTCFG'
+        path-exclude /usr/share/doc/*
+        path-exclude /usr/share/fonts/*
+        path-exclude /usr/share/icons/*
+        path-exclude /usr/share/info/*
+        path-exclude /usr/share/man/*
+        APTCFG
+
+          if [[ "$protocol_level" -ge 3 ]]; then
+            sudo apt-get -y remove --purge \
+              '^apache2.*' \
+              '^aspnetcore-.*' \
+              azure-cli \
+              buildah \
+              '^byobu.*' \
+              '^clang-.*' \
+              containerd.io \
+              containernetworking-plugins \
+              '^docker.*' \
+              '^dotnet-.*' \
+              firefox \
+              '^fonts-.*' \
+              fwupd \
+              '^gfortran-.*' \
+              '^google-.*' \
+              '^gradle.*' \
+              '^java.*' \
+              '^kotlin.*' \
+              kubectl \
+              '^libclang-.*' \
+              libgl1-mesa-dri \
+              '^libgirepository-.*' \
+              '^libgtk-.*' \
+              '^libllvm-.*' \
+              '^libx265-.*' \
+              '^llvm-.*' \
+              man-db \
+              '^mecab.*' \
+              mediainfo \
+              '^mercurial.*' \
+              microsoft-edge-stable \
+              '^mongodb-.*' \
+              '^mono-.*' \
+              '^mssql-.*' \
+              '^mysql-.*' \
+              '^nginx-.*' \
+              '^php.*' \
+              '^podman.*' \
+              '^powershell.*' \
+              '^postgres.*' \
+              python-babel-localedata \
+              '^python3-babel.*' \
+              '^python3-boto.*' \
+              '^ruby.*' \
+              '^r-base.*' \
+              skopeo \
+              snapd \
+              tcl \
+              tk \
+              '^tex-.*' \
+              '^vim.*'
+            sudo apt-get -y autoremove --purge
+          fi
+
+          sudo apt-get -y clean
+          echo "Cleanse apt complete" > $expansion_dir/apt_done
+        fi
         
         # Cleave
         if [[ "$protocol_level" -ge 2 ]]; then
@@ -214,6 +259,7 @@ runs:
             "${HOME}/.cargo" \
             "${HOME}/.dotnet" \
             /usr/local \
+            /opt/containerd \
             /opt/hostedtoolcache \
             /opt/microsoft \
             /opt/az \
@@ -227,78 +273,30 @@ runs:
         # Rampage
         if [[ "$protocol_level" -ge 3 ]]; then
           sudo rmz -f \
-            /usr/bin/buildah \
             /usr/bin/docker* \
-            /usr/bin/java* \
             /usr/bin/kotlin* \
-            /usr/bin/kubectl \
-            /usr/bin/mono* \
-            /usr/bin/my* \
-            /usr/bin/pedump \
-            /usr/bin/perror \
-            /usr/bin/php* \
-            /usr/bin/podman* \
-            /usr/bin/ruby* \
-            /usr/bin/tcpdump \
-            /usr/bin/skopeo \
-            /usr/bin/vim* \
-            /usr/bin/x86_64-* \
-            /usr/lib/*-linux-gnu/libLLVM* \
-            /usr/lib/*-linux-gnu/libclang* \
-            /usr/lib/*-linux-gnu/liblldb* \
-            /usr/lib/*-linux-gnu/libmysql* \
-            /usr/lib/cgi-bin \
-            /usr/lib/dotnet \
-            /usr/lib/firefox \
-            /usr/lib/gcc \
-            /usr/lib/google-cloud-sdk \
-            /usr/lib/heroku* \
-            /usr/lib/jvm \
-            /usr/lib/llvm* \
-            /usr/lib/mecab \
-            /usr/lib/*mono* \
-            /usr/lib/mysql \
-            /usr/lib/php \
-            /usr/lib/postgresql \
-            /usr/lib/R \
-            /usr/lib/ruby \
-            /usr/sbin/mysql* \
-            /usr/sbin/php* \
-            /usr/sbin/nginx* \
-            /usr/share/apache* \
-            /usr/share/az* \
+            /usr/lib/heroku \
+            /usr/share/apache-* \
+            /usr/share/az_* \
             /usr/share/doc/* \
-            /usr/share/dotnet \
             /usr/share/fonts/* \
-            /usr/share/fwupd \
-            /usr/share/google-cloud-sdk \
-            /usr/share/gradle* \
+            /usr/share/gradle-* \
             /usr/share/icons/* \
             /usr/share/info/* \
+            /usr/share/kotlinc \
             /usr/share/java \
-            /usr/share/kotlin* \
             /usr/share/man/* \
-            /usr/share/mecab \
             /usr/share/miniconda \
-            /usr/share/mysql \
-            /usr/share/postgresql \
-            /usr/share/php* \
-            /usr/share/python-babel-localedata \
-            /usr/share/python-wheels \
-            /usr/share/R \
-            /usr/share/ri \
             /usr/share/sbt \
             /usr/share/swift \
-            /usr/share/swig* \
             /usr/share/tcltk \
             /usr/share/texinfo \
-            /usr/share/vim \
+            /var/lib/containerd \
             /var/lib/gems \
-            /var/lib/mecab \
+            /var/lib/docker \
             /var/lib/mysql \
-            /var/lib/podman \
-            /var/lib/postgresql \
-            /var/lib/ubuntu-advantage
+            /var/lib/ubuntu-advantage \
+            /var/lib/waagent
           echo "Rampage complete" > $expansion_dir/rampage_done
         fi
 
@@ -307,14 +305,11 @@ runs:
           echo "The Purge Is Complete!" > $expansion_dir/purge_done
           add_expansion_disk
         fi
+
+        echo "Everything completed" > $expansion_dir/all_done
         EOF
 
         # Make script executable and run in background
         chmod +x /tmp/expand_nix_volume.sh
         /tmp/expand_nix_volume.sh > ${HOME}/.expansion/expansion.log 2>&1 &
         echo "📈 Background space expansion started. /nix will grow as space becomes available."
-        
-        # Wait for the expand_nix_volume.sh process to finish
-        while wait -n; do
-          sleep 0.5
-        done

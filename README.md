@@ -68,7 +68,7 @@ Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically
    - Mounts with compression and performance tuning
    - Provides a 65GB `/nix` immediately, even before the purge begins
 
-2. **Background Expansion (30-60 seconds):**
+2. **Background Expansion (30-180 seconds):**
    - Executes purging operations based on your selected *Hatchet Protocol*
    - Monitors for newly freed space as bloat is eliminated
    - Dynamically adds an expansion disk to the `/nix` volume
