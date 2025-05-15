@@ -21,9 +21,7 @@ jobs:
         uses: ./.github/actions/this
         with:
           hatchet-protocol: ${{ matrix.hatchet-protocol }}
-      - uses: DeterminateSystems/nix-installer-action@main
-        with:
-          determinate: true
+      - uses: DeterminateSystems/determinate-nix-action@main
       - name: Run Nix
         run: |
           nix --version
