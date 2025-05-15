@@ -12,6 +12,14 @@ inputs:
     description: 'Display purge progress in real-time instead of running in background'
     required: false
     default: 'false'
+  root-safe-haven:
+    description: 'Space in MB to mercifully spare on the / filesystem (default: 2048)'
+    required: false
+    default: '2048'
+  mnt-safe-haven:
+    description: 'Space in MB to mercifully spare on the /mnt filesystem (default: 1024)'
+    required: false
+    default: '1024'
 runs:
   using: composite
   steps:
@@ -93,13 +101,12 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        # Create initial loop device using Holster approach (minimal space reclamation)
-        
         free_space=$(df -m --output=avail /mnt | tail -n 1 | tr -d ' ')
         echo "Initial free space of /mnt: ${free_space}MB"
         loop_dev=$(sudo losetup --find)
-        loop_num=${loop_dev##*/loop}        
-        if sudo fallocate -l $((free_space - 1024))M "/mnt/disk${loop_num}.img"; then  
+        loop_num=${loop_dev##*/loop}
+
+        if sudo fallocate -l $((free_space - ${{ inputs.mnt-safe-haven }}))M "/mnt/disk${loop_num}.img"; then
           sudo losetup ${loop_dev} "/mnt/disk${loop_num}.img"
         fi
           
@@ -133,16 +140,17 @@ runs:
         
         protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
         expansion_dir="${HOME}/.expansion"
+        root_safe_haven="${{ inputs.root-safe-haven }}"
         
         function add_expansion_disk() {
           # Check for additional free space after purging
           free_space=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
           echo "Free space of / after purge: ${free_space}MB"
 
-          # Create additional disk if at least 4GB free space exists
-          if [ $free_space -gt 4096 ]; then
-            # Calculate the size of the expansion disk, reserving 2GB
-            disk_size=$((free_space - 2048))
+          # Create additional disk if suitable free space exists
+          if [ $free_space -gt $((root_safe_haven + 2048)) ]; then
+            # Calculate the size of the expansion disk, reserving the safe haven
+            disk_size=$((free_space - root_safe_haven))
             echo "Creating expansion disk of ${disk_size}MB in /"
             # Create expansion disk image
             loop_dev=$(sudo losetup --find)
@@ -303,8 +311,7 @@ runs:
             /var/lib/gems \
             /var/lib/docker \
             /var/lib/mysql \
-            /var/lib/ubuntu-advantage \
-            /var/lib/waagent
+            /var/lib/ubuntu-advantage
           echo "Rampage complete" > $expansion_dir/rampage_done
         fi
 

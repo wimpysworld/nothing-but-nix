@@ -117,4 +117,22 @@ By default, the purging process executes silently in the background while your w
     witness-carnage: true  # Default: false
 ```
 
+### Customize Safe Havens 🛡️
+
+Control how much space to spare from the Nix store land grab with custom safe haven sizes:
+
+```yaml
+- uses: wimpysworld/nothing-but-nix@main
+  with:
+    ️hatchet-protocol: 'cleave'
+    root-safe-haven: '3072'   # Reserve 3GB on the / filesystem
+    mnt-safe-haven: '2048'    # Reserve 2GB on the /mnt filesystem
+```
+
+These safe havens define how much space (in MB) will be mercifully spared during space reclamation:
+- Default `root-safe-haven` is 2048MB (2GB)
+- Default `mnt-safe-haven` is 1024MB (1GB)
+
+Increase these values if you need more breathing room on your filesystems, or decrease them to show no mercy! 😈
+
 Now go and build something amazing with all that glorious Nix store space! ❄️
