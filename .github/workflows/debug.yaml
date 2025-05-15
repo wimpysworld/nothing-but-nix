@@ -21,12 +21,7 @@ jobs:
         uses: ./.github/actions/this
         with:
           hatchet-protocol: rampage
-      - name: Wait
-        run: |
-          while [ ! -f ${HOME}/.expansion/all_done ]; do
-            sleep 1
-            tail -n 1 ${HOME}/.expansion/expansion.log
-          done
+          witness-carnage: true
       - name: Debug
         run: |
           sudo du -csh /opt/* | grep -v "Z 0"

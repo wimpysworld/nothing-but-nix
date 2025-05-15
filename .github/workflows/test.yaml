@@ -21,17 +21,12 @@ jobs:
         uses: ./.github/actions/this
         with:
           hatchet-protocol: ${{ matrix.hatchet-protocol }}
+          witness-carnage: true
       - uses: DeterminateSystems/determinate-nix-action@main
       - name: Run Nix
         run: |
           nix --version
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
-      - name: Wait
-        run: |
-          while [ ! -f ${HOME}/.expansion/all_done ]; do
-            sleep 1
-            tail -n 1 ${HOME}/.expansion/expansion.log
-          done
       - name: Status
         run: |          
           cat ${HOME}/.expansion/expansion.log
