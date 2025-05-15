@@ -32,15 +32,12 @@ jobs:
         run: |
           while [ ! -f ${HOME}/.expansion/all_done ]; do
             sleep 1
-            if [ -f ${HOME}/.expansion/expansion.log ]; then
-              tail -n 1 ${HOME}/.expansion/expansion.log
-            fi
+            tail -n 1 ${HOME}/.expansion/expansion.log
           done
       - name: Status
         run: |          
-          if [ -f ${HOME}/.expansion/expansion.log ]; then
-            cat ${HOME}/.expansion/expansion.log
-          fi
+          cat ${HOME}/.expansion/expansion.log
+          
           ls -ltr ${HOME}/.expansion/*_done
           all_disks=()
   

@@ -111,7 +111,11 @@ runs:
         
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
-        echo "Initial volume created" > "${HOME}/.expansion/holster_done"
+        echo "Initial volume created" | tee "${HOME}/.expansion/holster_done"
+
+        sudo cp "${HOME}/.expansion/holster_done" /nix/.test
+        sudo sync -f /nix/.test
+        sleep 1
     - name: The Purge
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
@@ -258,7 +262,7 @@ runs:
             "${HOME}/.rustup" \
             "${HOME}/.cargo" \
             "${HOME}/.dotnet" \
-            /usr/local \
+            /usr/local/* \
             /opt/containerd \
             /opt/hostedtoolcache \
             /opt/microsoft \
