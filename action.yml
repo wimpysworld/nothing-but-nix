@@ -108,14 +108,17 @@ runs:
         sudo mkdir -p /nix
         sudo mount LABEL=nix /nix -o noatime,nobarrier,compress=zstd:1,space_cache=v2,commit=120
         sudo df -h
-        
+
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
         echo "Initial volume created" | tee "${HOME}/.expansion/holster_done"
-
-        sudo cp "${HOME}/.expansion/holster_done" /nix/.test
-        sudo sync -f /nix/.test
-        sleep 1
+    - name: The Local
+      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
+      shell: bash
+      run: |
+        # Nix is often installed in /usr/local, so we need to ensure that it is purged early
+        sudo rmz -f /usr/local
+        sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src} || true
     - name: The Purge
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
@@ -262,7 +265,6 @@ runs:
             "${HOME}/.rustup" \
             "${HOME}/.cargo" \
             "${HOME}/.dotnet" \
-            /usr/local/* \
             /opt/containerd \
             /opt/hostedtoolcache \
             /opt/microsoft \
@@ -270,7 +272,6 @@ runs:
             /opt/pipx* \
             /opt/google \
             /opt/mssql-tools
-          sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src}
           echo "Cleave complete" > $expansion_dir/cleave_done
         fi
         

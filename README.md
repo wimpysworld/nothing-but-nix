@@ -62,14 +62,14 @@ The end result? A GitHub Actions runner with **65GB to 130GB** of Nix-ready spac
 
 Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically:
 
-1. **Initial Volume Creation (~1 second):**
+1. **Initial Volume Creation (1-10 seconds):** (*depending on Hatchet Protocol*)
    - Creates a loop device from free space on `/mnt`
    - Sets up a BTRFS filesystem in RAID0 configuration
    - Mounts with compression and performance tuning
    - Provides a 65GB `/nix` immediately, even before the purge begins
 
-2. **Background Expansion (30-180 seconds):**
-   - Executes purging operations based on your selected *Hatchet Protocol*
+2. **Background Expansion (30-180 seconds):** (*depending on Hatchet Protocol*)
+   - Executes purging operations
    - Monitors for newly freed space as bloat is eliminated
    - Dynamically adds an expansion disk to the `/nix` volume
    - Rebalances the filesystem to incorporate new space
@@ -92,7 +92,7 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 |----------|--------|--------------------------------------------------|-------------|----------------|--------------|-------------------------|
 | Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt` | No          | No             | No           | No                      |
 | Carve    | ~85GB  | Craft and combine free space from `/` and `/mnt` | No          | No             | No           | No                      |
-| Cleave   | ~120GB | Make powerful, decisive cuts to large packages   | Minimal     | Yes            | No           | `/opt` and `/usr/local` |
+| Cleave   | ~115GB | Make powerful, decisive cuts to large packages   | Minimal     | Yes            | No           | `/opt` and `/usr/local` |
 | Rampage  | ~130GB | Relentless, brutal elimination of all bloat      | Aggressive  | Yes            | Yes          | Muahahaha! 🔥🌎         |
 
 Choose wisely:
