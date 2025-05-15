@@ -5,7 +5,7 @@
 GitHub Actions runners come with meager disk space for Nix - a mere ~20GB.
 *Nothing but Nix* **brutally purges** unnecessary software, giving you **65GB to 130GB** for your Nix store! 💪
 
-## Usage
+## Usage 🔧
 
 Add this action **before** installing Nix in your workflow:
 
@@ -26,6 +26,11 @@ jobs:
           nix --version
           # Your Nix-powered steps here...
 ```
+
+### Requirements ️✔️
+
+- Only supports official **Ubuntu** GitHub Actions runners
+- Must run **before** Nix is installed
 
 ## The Problem: Making Room for Nix to Thrive 🌱
 
@@ -86,7 +91,7 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
     hatchet-protocol: 'cleave'  # Options: holster, carve, cleave (default), rampage
 ```
 
-#### Protocol Comparison
+#### Protocol Comparison ⚖️
 
 | Protocol | `/nix` | Description                                      | Cleanse apt | Cleanse docker | Cleanse snap | Filesystems purged      |
 |----------|--------|--------------------------------------------------|-------------|----------------|--------------|-------------------------|
@@ -101,9 +106,15 @@ Choose wisely:
 - **Cleave** (*default*) for a good balance of space and functionality
 - **Rampage** when you need maximum Nix space and don't care what breaks `#nix-is-life`
 
-## Requirements
+### Witness The Carnage 🩸
 
-- Only supports official **Ubuntu** GitHub Actions runners
-- Must run **before** Nix is installed
+By default, the purging process executes silently in the background while your workflow continues. But if you want to watch the slaughter in real-time:
+
+```yaml
+- uses: wimpysworld/nothing-but-nix@main
+  with:
+    ️hatchet-protocol: 'cleave'
+    witness-carnage: true  # Default: false
+```
 
 Now go and build something amazing with all that glorious Nix store space! ❄️

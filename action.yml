@@ -8,6 +8,10 @@ inputs:
     description: 'Level of file purging (Holster: none, Cleave: standard, Rampage: aggressive)'
     required: false
     default: 'cleave'
+  witness-carnage:
+    description: 'Display purge progress in real-time instead of running in background'
+    required: false
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -124,7 +128,7 @@ runs:
       shell: bash
       run: |
         cat > /tmp/expand_nix_volume.sh << 'EOF'
-        #!/bin/bash
+        #!/usr/bin/env bash
         set -e
         
         protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
@@ -314,7 +318,13 @@ runs:
         echo "Everything completed" > $expansion_dir/all_done
         EOF
 
-        # Make script executable and run in background
+        # Make script executable
         chmod +x /tmp/expand_nix_volume.sh
-        /tmp/expand_nix_volume.sh > ${HOME}/.expansion/expansion.log 2>&1 &
-        echo "📈 Background space expansion started. /nix will grow as space becomes available."
+        # Execute based on witness-carnage setting
+        if [ "${{ inputs.witness-carnage }}" == "true" ]; then
+          echo "😮 Displaying the carnage in real-time. This will block until completion."
+          /tmp/expand_nix_volume.sh | tee ${HOME}/.expansion/expansion.log
+        else
+          /tmp/expand_nix_volume.sh > ${HOME}/.expansion/expansion.log 2>&1 &
+          echo "📈 Background space expansion started. /nix will grow as space becomes available."
+        fi
