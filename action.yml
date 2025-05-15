@@ -181,18 +181,16 @@ runs:
             docker rmi --force "${CRUFT}" || true
           done
           docker system prune --all --force
+          sudo apt-get -y remove --purge '^docker.*'
+          sudo rmz -f /usr/bin/docker* /var/lib/docker
           echo "Cleanse docker complete" > $expansion_dir/docker_done
         fi
 
         # Cleanse snap
-        if [[ "$protocol_level" -ge 3 ]]; then
-          sudo systemctl stop snapd.service || true
-          sudo systemctl disable snapd.service || true
-          sudo systemctl mask snapd.service || true
-          sudo umount --recursive /snap/*/* || true
+        if [[ "$protocol_level" -ge 2 ]]; then
+          sudo apt-get -y remove --purge snapd
           sudo rmz -f \
             /snap \
-            /usr/bin/snap* \
             /usr/lib/snapd \
             /var/snap \
             /var/lib/snapd \
@@ -220,7 +218,6 @@ runs:
               '^clang-.*' \
               containerd.io \
               containernetworking-plugins \
-              '^docker.*' \
               '^dotnet-.*' \
               firefox \
               '^fonts-.*' \
@@ -258,7 +255,6 @@ runs:
               '^ruby.*' \
               '^r-base.*' \
               skopeo \
-              snapd \
               tcl \
               tk \
               '^tex-.*' \
@@ -289,7 +285,6 @@ runs:
         # Rampage
         if [[ "$protocol_level" -ge 3 ]]; then
           sudo rmz -f \
-            /usr/bin/docker* \
             /usr/bin/kotlin* \
             /usr/lib/heroku \
             /usr/share/apache-* \
@@ -309,7 +304,6 @@ runs:
             /usr/share/texinfo \
             /var/lib/containerd \
             /var/lib/gems \
-            /var/lib/docker \
             /var/lib/mysql \
             /var/lib/ubuntu-advantage
           echo "Rampage complete" > $expansion_dir/rampage_done

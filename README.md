@@ -93,12 +93,12 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 
 #### Protocol Comparison ⚖️
 
-| Protocol | `/nix` | Description                                      | Cleanse apt | Cleanse docker | Cleanse snap | Filesystems purged      |
-|----------|--------|--------------------------------------------------|-------------|----------------|--------------|-------------------------|
-| Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt` | No          | No             | No           | No                      |
-| Carve    | ~85GB  | Craft and combine free space from `/` and `/mnt` | No          | No             | No           | No                      |
-| Cleave   | ~115GB | Make powerful, decisive cuts to large packages   | Minimal     | Yes            | No           | `/opt` and `/usr/local` |
-| Rampage  | ~130GB | Relentless, brutal elimination of all bloat      | Aggressive  | Yes            | Yes          | Muahahaha! 🔥🌎         |
+| Protocol | `/nix` | Description                                      | Purge apt  | Purge docker | Purge snap | Purged file systems     |
+|----------|--------|--------------------------------------------------|------------|--------------|------------|-------------------------|
+| Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt` | No         | No           | No         | None                    |
+| Carve    | ~85GB  | Craft and combine free space from `/` and `/mnt` | No         | No           | No         | None                    |
+| Cleave   | ~115GB | Make powerful, decisive cuts to large packages   | Cache only | Yes          | Yes        | `/opt` and `/usr/local` |
+| Rampage  | ~130GB | Relentless, brutal elimination of all bloat      | Aggressive | Yes          | Yes        | Muahahaha! 🔥🌎         |
 
 Choose wisely:
 - **Holster** when you need the runner's tools to remain fully functional
