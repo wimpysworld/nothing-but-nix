@@ -157,7 +157,6 @@ runs:
               # Balance the filesystem to use the new space
               sudo btrfs balance start -dusage=50 /nix
               sudo btrfs filesystem show
-              sudo df -h
             fi
           fi
         }
@@ -328,3 +327,28 @@ runs:
           /tmp/expand_nix_volume.sh > ${HOME}/.expansion/expansion.log 2>&1 &
           echo "📈 Background space expansion started. /nix will grow as space becomes available."
         fi
+    - name: The Post
+      uses: srz-zumix/post-run-action@v2
+      with:
+        shell: bash -e {0}
+        post-run: |
+          ls -ltr ${HOME}/.expansion/*_done
+          all_disks=()
+  
+          # Check for disks in /mnt directory
+          mnt_disks=(/mnt/disk*.img)
+          if [[ -e "${mnt_disks[0]}" ]]; then
+            all_disks+=("${mnt_disks[@]}")
+          fi
+
+          # Check for disks in / directory
+          root_disks=(/disk*.img)
+          if [[ -e "${root_disks[0]}" ]]; then
+            all_disks+=("${root_disks[@]}")
+          fi        
+          
+          echo "Found ${#all_disks[@]} disk image(s):"
+          for disk in "${all_disks[@]}"; do
+            echo "- $disk ($(du -h "$disk" | cut -f1))"
+          done
+          sudo df -h

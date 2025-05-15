@@ -1,6 +1,11 @@
 name: Debug 🐛
 on:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+  
 jobs:
   test-ubuntu:
     name: Debug ${{ matrix.os }}
@@ -30,4 +35,3 @@ jobs:
           sudo du -csh /usr/share/* | grep -v "Z 0"
           sudo du -csh /var/lib/* | grep -v "Z 0"
           dpkg-query -W -f='${Installed-Size;8}\t${Status;1}\t${Package}\n' | grep -v "\sd\s" | sort -n | cut -f1,3-
-          sudo df -h
