@@ -27,6 +27,8 @@ jobs:
         with:
           hatchet-protocol: rampage
           witness-carnage: true
+          mnt-safe-haven: 10240
+          root-safe-haven: 10240
       - name: Debug
         run: |
           sudo du -csh /opt/* | grep -v "Z 0"
