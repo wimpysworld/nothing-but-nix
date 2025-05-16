@@ -117,7 +117,7 @@ runs:
 
         # Mount filesystem
         sudo mkdir -p /nix
-        sudo mount LABEL=nix /nix -o noatime,nobarrier,compress=zstd:1,space_cache=v2,commit=120
+        sudo mount LABEL=nix /nix -o noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120
         sudo df -h
 
         # Create a directory to store expansion state
@@ -159,7 +159,7 @@ runs:
               sudo losetup ${loop_dev} "/disk${loop_num}.img"
               
               # Add the new device to the pool
-              sudo btrfs device add ${loop_dev} /nix
+              sudo btrfs device add --nodiscard ${loop_dev} /nix
               echo "Added expansion disk "/disk${loop_num}.img" (${loop_dev}, ${disk_size}MB) to /nix pool" > $expansion_dir/expansion_done
               
               # Balance the filesystem to use the new space
