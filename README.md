@@ -97,7 +97,7 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 |----------|--------|--------------------------------------------------|------------|--------------|------------|-------------------------|
 | Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt` | No         | No           | No         | None                    |
 | Carve    | ~85GB  | Craft and combine free space from `/` and `/mnt` | No         | No           | No         | None                    |
-| Cleave   | ~115GB | Make powerful, decisive cuts to large packages   | Cache only | Yes          | Yes        | `/opt` and `/usr/local` |
+| Cleave   | ~115GB | Make powerful, decisive cuts to large packages   | Minimal    | Yes          | Yes        | `/opt` and `/usr/local` |
 | Rampage  | ~130GB | Relentless, brutal elimination of all bloat      | Aggressive | Yes          | Yes        | Muahahaha! 🔥🌎         |
 
 Choose wisely:

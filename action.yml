@@ -259,9 +259,9 @@ runs:
               tk \
               '^tex-.*' \
               '^vim.*'
-            sudo apt-get -y autoremove --purge
           fi
 
+          sudo apt-get -y autoremove --purge
           sudo apt-get -y clean
           echo "Cleanse apt complete" > $expansion_dir/apt_done
         fi
