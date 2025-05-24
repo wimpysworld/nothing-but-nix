@@ -7,8 +7,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-ubuntu:
-    name: Test ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
+  determinate-nix-action:
+    name: determinate-nix-action on ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -33,4 +33,30 @@ jobs:
         run: |
           nix --version
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
+  nix-quick-install:
+    name: nix-quick-action on ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+        hatchet-protocol: [holster, carve, cleave, rampage]
+      fail-fast: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: ${{ matrix.hatchet-protocol }}
+          witness-carnage: true
+      - uses: nixbuild/nix-quick-install-action@v30
+      - name: Nix
+        run: |
+          nix --version
+          echo "Hello Nix" | nix run "nixpkgs#neo-cowsay"
           
