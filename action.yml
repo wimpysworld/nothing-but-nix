@@ -118,6 +118,7 @@ runs:
         # Mount filesystem
         sudo mkdir -p /nix
         sudo mount LABEL=nix /nix -o noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120
+        sudo chown -R "$(id --user)":"$(id --group)" /nix
         sudo df -h
 
         # Create a directory to store expansion state
