@@ -27,13 +27,23 @@ runs:
       id: environment-check
       shell: bash
       run: |
-        if [ "$(lsb_release -is)" != "Ubuntu" ]; then
-          echo "is_supported=false" >> $GITHUB_OUTPUT
-          echo "This action only works on Ubuntu runners"
-        elif [ -z "$GITHUB_ACTIONS" ]; then
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          if [ "$(lsb_release -is)" != "Ubuntu" ]; then
+            echo "is_supported=false" >> $GITHUB_OUTPUT
+            echo "This action only works on Ubuntu runners"
+            exit 1
+          else
+            echo "is_supported=true" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+        if [ -z "$GITHUB_ACTIONS" ]; then
           echo "is_supported=false" >> $GITHUB_OUTPUT
           echo "This action only works on GitHub Actions runner"
-        elif [ -d /nix ]; then
+          exit 1
+        fi
+
+        if [ -d /nix ]; then
           echo "is_supported=false" >> $GITHUB_OUTPUT
           echo "This action must be run before Nix is installed"
           exit 1
@@ -329,6 +339,7 @@ runs:
           echo "📈 Background space expansion started. /nix will grow as space becomes available."
         fi
     - name: The Post
+      if: ${{ runner.os }} == 'Linux'
       uses: srz-zumix/post-run-action@v2
       with:
         shell: bash -e {0}
