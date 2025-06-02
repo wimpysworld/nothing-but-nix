@@ -135,4 +135,16 @@ These safe havens define how much space (in MB) will be mercifully spared during
 
 Increase these values if you need more breathing room on your filesystems, or decrease them to show no mercy! 😈
 
+### Grant User Ownership of /nix (Nix Permission Edict) 🧑‍⚖️
+
+Some Nix installers or configurations expect the `/nix` directory to be writable by the current user. By default, `/nix` is owned by root. If you need user ownership (e.g., for certain Nix installer scripts that don't use `sudo` for all operations within `/nix`), you can enable the `nix-permission-edict`:
+
+```yaml
+- uses: wimpysworld/nothing-but-nix@main
+  with:
+    nix-permission-edict: true  # Default: false
+```
+
+When `nix-permission-edict` is set to `true`, the action will run `sudo chown -R "$(id --user)":"$(id --group)" /nix` after mounting `/nix`.
+
 Now go and build something amazing with all that glorious Nix store space! ❄️
