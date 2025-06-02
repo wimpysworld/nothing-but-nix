@@ -20,6 +20,10 @@ inputs:
     description: 'Space in MB to mercifully spare on the /mnt filesystem (default: 1024)'
     required: false
     default: '1024'
+  nix-permission-edict:
+    description: 'Grant user ownership of /nix directory (default: false). Useful for Nix installers that require user-writable /nix.'
+    required: false
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -129,6 +133,11 @@ runs:
         sudo mkdir -p /nix
         sudo mount LABEL=nix /nix -o noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120
         sudo df -h
+
+        if [[ "${{ inputs.nix-permission-edict }}" == "true" ]]; then
+          echo "Applying Nix Permission Edict: Granting user ownership of /nix"
+          sudo chown -R "$(id --user)":"$(id --group)" /nix
+        fi
 
         # Create a tmp directory within /nix for Nix builds and set TMPDIR
         sudo mkdir -p /nix/_temp
