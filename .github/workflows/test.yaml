@@ -33,6 +33,8 @@ jobs:
         run: |
           nix --version
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
+          # Build a package to ensure the Nix store is functional
+          nix build "https://flakehub.com/f/NixOS/nixpkgs/*#hello"
   nix-quick-install:
     name: nix-quick-action on ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
     runs-on: ${{ matrix.os }}
@@ -59,4 +61,6 @@ jobs:
         run: |
           nix --version
           echo "Hello Nix" | nix run "nixpkgs#neo-cowsay"
+          # Build a package to ensure the Nix store is functional
+          nix build "nixpkgs#hello"
           
