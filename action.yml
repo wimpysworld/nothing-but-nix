@@ -130,6 +130,12 @@ runs:
         sudo mount LABEL=nix /nix -o noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120
         sudo df -h
 
+        # Create a tmp directory within /nix for Nix builds and set TMPDIR
+        sudo mkdir -p /nix/_temp
+        sudo chmod 1777 /nix/_temp
+        echo "TMPDIR=/nix/_temp" >> $GITHUB_ENV
+        echo "Set TMPDIR=/nix/_temp to use space on the /nix volume for builds."
+
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
         echo "Initial volume created" | tee "${HOME}/.expansion/holster_done"
@@ -363,4 +369,7 @@ runs:
           for disk in "${all_disks[@]}"; do
             echo "- $disk ($(du -h "$disk" | cut -f1))"
           done
+          echo "Space used by TMPDIR:"
+          sudo du -csh "$TMPDIR" || true
+          echo "Space used by disk images:"
           sudo df -h
