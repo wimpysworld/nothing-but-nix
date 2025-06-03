@@ -8,7 +8,7 @@ concurrency:
 
 jobs:
   determinate-nix-action:
-    name: determinate-nix-action on ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
+    name: determinate-nix-action (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -36,7 +36,7 @@ jobs:
           # Build a package to ensure the Nix store is functional
           nix build "https://flakehub.com/f/NixOS/nixpkgs/*#hello"
   nix-quick-install:
-    name: nix-quick-action on ${{ matrix.os }} with ${{ matrix.hatchet-protocol }}
+    name: nix-quick-action (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -64,4 +64,32 @@ jobs:
           echo "Hello Nix" | nix run "nixpkgs#neo-cowsay"
           # Build a package to ensure the Nix store is functional
           nix build "nixpkgs#hello"
-          
+  cachix-nix-action:
+    name: cachix-nix-action (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+        hatchet-protocol: [holster, carve, cleave, rampage]
+      fail-fast: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: ${{ matrix.hatchet-protocol }}
+          witness-carnage: true
+          nix-permission-edict: true
+      - uses: cachix/install-nix-action@v31
+      - name: Nix
+        run: |
+          nix --version
+          echo "Hello Nix" | nix run "nixpkgs#neo-cowsay"
+          # Build a package to ensure the Nix store is functional
+          nix build "nixpkgs#hello"          

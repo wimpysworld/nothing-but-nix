@@ -139,11 +139,11 @@ runs:
           sudo chown -R "$(id --user)":"$(id --group)" /nix
         fi
 
-        # Create a tmp directory within /nix for Nix builds and set TMPDIR
-        sudo mkdir -p /nix/_temp
-        sudo chmod 1777 /nix/_temp
-        echo "TMPDIR=/nix/_temp" >> $GITHUB_ENV
-        echo "Set TMPDIR=/nix/_temp to use space on the /nix volume for builds."
+        # Create a tmp directory within /mnt for Nix builds and set TMPDIR
+        TMPNIX="$(sudo mktemp --directory --tmpdir=/mnt)"
+        sudo chmod 1777 "${TMPNIX}"
+        echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
+        echo "TMPDIR set to ${TMPNIX} to use space on the /mnt volume for builds."
 
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
@@ -382,3 +382,8 @@ runs:
           sudo du -csh "$TMPDIR" || true
           echo "Space used by disk images:"
           sudo df -h
+          echo "Check which device(s) btrfs is using:"
+          sudo btrfs filesystem show /nix
+          echo "See actual allocation per device:"
+          sudo btrfs device stats /nix
+          
