@@ -61,7 +61,7 @@ runs:
       run: |
         input_protocol="${{ inputs.hatchet-protocol }}"
         # Convert to lowercase for case-insensitive comparison
-        input_protocol="${input_protocol,,}"
+        input_protocol="$(tr '[:upper:]' '[:lower:]' <<< "$input_protocol")"
         
         case "$input_protocol" in
           "holster")
