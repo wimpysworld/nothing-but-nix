@@ -359,7 +359,7 @@ runs:
       with:
         shell: bash -e {0}
         post-run: |
-          ls -ltr ${HOME}/.expansion/*_done
+          ls -ltr ${HOME}/.expansion/*_done || true
           all_disks=()
   
           # Check for disks in /mnt directory
