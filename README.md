@@ -180,6 +180,28 @@ Some Nix installers or configurations expect the `/nix` directory to be writable
 
 When `nix-permission-edict` is set to `true`, the action will run `sudo chown -R "$(id --user)":"$(id --group)" /nix` after mounting `/nix`.
 
+### Configure Nix to use /nix/build
+
+This action creates `/nix/build` for Nix derivation builds to use the reclaimed space. Add `build-dir` to your Nix configuration:
+
+```yaml
+- uses: cachix/install-nix-action@v31
+  with:
+    extra_nix_config: |
+      build-dir = /nix/build
+```
+
+Or with DeterminateSystems:
+
+```yaml
+- uses: DeterminateSystems/nix-installer-action@main
+  with:
+    extra-conf: |
+      build-dir = /nix/build
+```
+
+This directs Nix to perform builds on the large BTRFS volume rather than the system's default temporary directory.
+
 ## Troubleshooting 🔍
 
 ### "No space left on device" during large builds
