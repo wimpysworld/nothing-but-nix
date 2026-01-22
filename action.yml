@@ -180,7 +180,7 @@ runs:
         fi
 
         # Create TMPDIR on /mnt for Nix installer compatibility
-        TMPNIX="$(mktemp --directory --tmpdir=/mnt)"
+        TMPNIX="$(sudo mktemp --directory --tmpdir=/mnt)"
         sudo chmod 1777 "${TMPNIX}"
         echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
 
