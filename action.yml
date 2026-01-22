@@ -83,7 +83,7 @@ runs:
         input_protocol="${{ inputs.hatchet-protocol }}"
         # Convert to lowercase for case-insensitive comparison
         input_protocol="$(tr '[:upper:]' '[:lower:]' <<< "$input_protocol")"
-        
+
         case "$input_protocol" in
           "holster")
             echo "🪓 Hatchet Protocol: Holster - Keep the hatchet sheathed, use space from /mnt (Level 0)"
@@ -107,7 +107,7 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 1
       shell: bash
       run: |
-        ARCH=$(uname -m)          
+        ARCH=$(uname -m)
         if [[ "$ARCH" == "x86_64" ]]; then
           URL_ARCH="x86_64"
         elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
@@ -116,7 +116,7 @@ runs:
           echo "Unsupported architecture: $ARCH"
           exit 1
         fi
-        
+
         OS=$(uname -s)
         if [[ "$OS" == "Linux" ]]; then
           URL_OS="unknown-linux-gnu"
@@ -126,7 +126,7 @@ runs:
           echo "Unsupported OS: $OS"
           exit 1
         fi
-        
+
         DOWNLOAD_URL="https://github.com/SUPERCILEX/fuc/releases/download/3.0.1/${URL_ARCH}-${URL_OS}-rmz"
         curl -L -o rmz "$DOWNLOAD_URL"
         chmod +x rmz
@@ -160,7 +160,7 @@ runs:
           echo "❌ Failed to allocate disk image on /mnt"
           exit 1
         fi
-          
+
         # Create filesystem
         sudo mkfs.btrfs -L nix -d raid0 -m raid0 --nodiscard "${loop_dev}"
         sudo btrfs device scan
@@ -201,11 +201,11 @@ runs:
         cat > /tmp/expand_nix_volume.sh << 'EOF'
         #!/usr/bin/env bash
         set -e
-        
+
         protocol_level="${{ steps.set-hatchet-protocol.outputs.level }}"
         expansion_dir="${HOME}/.expansion"
         root_safe_haven="${{ inputs.root-safe-haven }}"
-        
+
         function add_expansion_disk() {
           # Check for additional free space after purging
           free_space=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
@@ -221,11 +221,11 @@ runs:
             loop_num=${loop_dev##*/loop}
             if sudo fallocate -l ${disk_size}M "/disk${loop_num}.img"; then
               sudo losetup ${loop_dev} "/disk${loop_num}.img"
-              
+
               # Add the new device to the pool
               sudo btrfs device add --nodiscard ${loop_dev} /nix
               echo "Added expansion disk "/disk${loop_num}.img" (${loop_dev}, ${disk_size}MB) to /nix pool" > $expansion_dir/expansion_done
-              
+
               # Balance the filesystem to use the new space
               sudo btrfs balance start -dusage=50 /nix
               sudo btrfs filesystem show
@@ -329,7 +329,7 @@ runs:
           sudo apt-get -y clean
           echo "Cleanse apt complete" > $expansion_dir/apt_done
         fi
-        
+
         # Cleave
         if [[ "$protocol_level" -ge 2 ]]; then
           sudo rmz -f \
@@ -345,7 +345,7 @@ runs:
             /opt/mssql-tools
           echo "Cleave complete" > $expansion_dir/cleave_done
         fi
-        
+
         # Rampage
         if [[ "$protocol_level" -ge 3 ]]; then
           sudo rmz -f \
@@ -400,7 +400,7 @@ runs:
         post-run: |
           ls -ltr ${HOME}/.expansion/*_done || true
           all_disks=()
-  
+
           # Check for disks in /mnt directory
           mnt_disks=(/mnt/disk*.img)
           if [[ -e "${mnt_disks[0]}" ]]; then
@@ -411,8 +411,8 @@ runs:
           root_disks=(/disk*.img)
           if [[ -e "${root_disks[0]}" ]]; then
             all_disks+=("${root_disks[@]}")
-          fi        
-          
+          fi
+
           echo "Found ${#all_disks[@]} disk image(s):"
           for disk in "${all_disks[@]}"; do
             echo "- $disk ($(du -h "$disk" | cut -f1))"
@@ -425,4 +425,3 @@ runs:
           sudo btrfs filesystem show /nix
           echo "See actual allocation per device:"
           sudo btrfs device stats /nix
-          
