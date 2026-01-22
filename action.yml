@@ -31,25 +31,46 @@ runs:
       id: environment-check
       shell: bash
       run: |
+        # Check for macOS/Darwin - warn but don't fail
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
+          echo "ℹ️  macOS/Darwin runners do not require this action - they already provide sufficient space for Nix."
+          echo "ℹ️  This action will be skipped and your workflow will continue normally."
+          exit 0
+        fi
+
+        # Check for Windows - warn but don't fail
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
+          echo "ℹ️  Windows runners do not require this action - they have different filesystem layouts and constraints."
+          echo "ℹ️  This action will be skipped and your workflow will continue normally."
+          exit 0
+        fi
+
+        # Check for Ubuntu on Linux runners
         if [[ "${{ runner.os }}" == "Linux" ]]; then
           if [ "$(lsb_release -is)" != "Ubuntu" ]; then
             echo "is_supported=false" >> $GITHUB_OUTPUT
-            echo "This action only works on Ubuntu runners"
+            echo "❌ This action only works on Ubuntu runners"
             exit 1
           else
             echo "is_supported=true" >> $GITHUB_OUTPUT
           fi
         fi
 
+        # Check for GitHub Actions environment
         if [ -z "$GITHUB_ACTIONS" ]; then
           echo "is_supported=false" >> $GITHUB_OUTPUT
-          echo "This action only works on GitHub Actions runner"
+          echo "❌ This action only works on GitHub Actions runners"
           exit 1
         fi
 
+        # Check that Nix is not already installed
         if [ -d /nix ]; then
           echo "is_supported=false" >> $GITHUB_OUTPUT
-          echo "This action must be run before Nix is installed"
+          echo "❌ This action must be run before Nix is installed"
           exit 1
         else
           echo "is_supported=true" >> $GITHUB_OUTPUT

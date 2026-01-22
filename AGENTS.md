@@ -12,7 +12,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 ## Technology Stack
 
-- **Platform**: GitHub Actions composite action (Ubuntu runners only)
+- **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS and Windows runners gracefully skip)
 - **Shell**: Bash (embedded in `action.yml`)
 - **Filesystem**: BTRFS with RAID0, zstd compression, loop devices
 - **Tools**: `rmz` (Fast Unix Commands), Docker CLI, APT, snap
@@ -27,7 +27,9 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 ├── LICENSE                 # MIT licence
 └── .github/
     └── workflows/
-        ├── test.yaml       # Integration tests with multiple Nix installers
+        ├── test.yaml       # Integration tests with multiple Nix installers (Ubuntu)
+        ├── test-macos.yaml # macOS guard rail validation tests
+        ├── test-windows.yaml # Windows guard rail validation tests
         └── debug.yaml      # Debugging workflow for space usage analysis
 ```
 
@@ -44,7 +46,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 The action follows a specific execution order:
 
-1. **The Checks**: Validate environment (Ubuntu, GitHub Actions, no pre-existing `/nix`)
+1. **The Checks**: Validate environment (Ubuntu on Linux, macOS/Windows graceful skip, GitHub Actions, no pre-existing `/nix`)
 2. **The Hatchet Protocol**: Set purge level (0-3)
 3. **The Setup**: Download and install `rmz` binary (protocol level ≥2)
 4. **The Volume**: Create initial BTRFS volume from `/mnt` free space
@@ -190,6 +192,8 @@ Before submitting changes:
 ## Constraints
 
 - **Ubuntu only**: Action checks for Ubuntu via `lsb_release -is`
+- **macOS graceful skip**: Action detects macOS/Darwin runners and exits gracefully with a warning (workflow continues)
+- **Windows graceful skip**: Action detects Windows runners and exits gracefully with a warning (workflow continues)
 - **Pre-Nix only**: Must run before Nix installation (checks for `/nix` directory)
 - **GitHub Actions only**: Requires `$GITHUB_ACTIONS` environment variable
 - **BTRFS required**: Ubuntu runners include BTRFS tools by default

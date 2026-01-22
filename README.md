@@ -62,6 +62,8 @@ jobs:
 
 - Only supports official **Ubuntu** GitHub Actions runners
 - Must run **before** Nix is installed
+- **macOS/Darwin runners**: This action will gracefully skip with a warning if run on macOS. macOS runners already provide sufficient space for Nix and do not require this action
+- **Windows runners**: This action will gracefully skip with a warning if run on Windows. Windows runners have different filesystem layouts and constraints
 
 ## The Problem: Making Room for Nix to Thrive 🌱
 

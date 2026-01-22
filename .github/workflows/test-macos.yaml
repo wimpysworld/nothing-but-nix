@@ -1,0 +1,30 @@
+name: Test macOS Guard Rails 🍎
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  test-macos-guard-rails:
+    name: Test macOS Guard Rails
+    runs-on: macos-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: ./.github/actions/this
+      - name: Test Nothing but Nix (should skip gracefully)
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: cleave
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - name: Verify Nix Installation
+        run: |
+          nix --version
+          echo "✅ macOS workflow continued successfully after nothing-but-nix was skipped"
+          echo "Hello from macOS" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
