@@ -138,11 +138,27 @@ runs:
       run: |
         free_space=$(df -m --output=avail /mnt | tail -n 1 | tr -d ' ')
         echo "Initial free space of /mnt: ${free_space}MB"
+
+        # Minimum usable space: safe haven + 1024MB for a useful initial volume
+        min_required=$((${{ inputs.mnt-safe-haven }} + 1024))
+        if [ "${free_space}" -lt "${min_required}" ]; then
+          echo "❌ Insufficient free space on /mnt to create initial volume."
+          echo "   Available: ${free_space}MB, Required: at least ${min_required}MB"
+          echo "   Contents of /mnt:"
+          sudo ls -lah /mnt
+          echo "   This may indicate leftover data from a previous job on this runner."
+          echo "   Try re-running the workflow to get a different runner."
+          exit 1
+        fi
+
         loop_dev=$(sudo losetup --find)
         loop_num=${loop_dev##*/loop}
 
         if sudo fallocate -l $((free_space - ${{ inputs.mnt-safe-haven }}))M "/mnt/disk${loop_num}.img"; then
           sudo losetup ${loop_dev} "/mnt/disk${loop_num}.img"
+        else
+          echo "❌ Failed to allocate disk image on /mnt"
+          exit 1
         fi
           
         # Create filesystem
