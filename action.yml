@@ -160,11 +160,13 @@ runs:
           sudo chown -R "$(id --user)":"$(id --group)" /nix
         fi
 
-        # Create a tmp directory within /mnt for Nix builds and set TMPDIR
-        TMPNIX="$(sudo mktemp --directory --tmpdir=/mnt)"
+        # Create a tmp directory within /nix for Nix builds and set TMPDIR
+        # This ensures builds use the large BTRFS volume rather than depleted /mnt
+        TMPNIX="/nix/_tmp"
+        sudo mkdir -p "${TMPNIX}"
         sudo chmod 1777 "${TMPNIX}"
         echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
-        echo "TMPDIR set to ${TMPNIX} to use space on the /mnt volume for builds."
+        echo "TMPDIR set to ${TMPNIX} to use space on the /nix volume for builds."
 
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
@@ -399,8 +401,8 @@ runs:
           for disk in "${all_disks[@]}"; do
             echo "- $disk ($(du -h "$disk" | cut -f1))"
           done
-          echo "Space used by TMPDIR:"
-          sudo du -csh "$TMPDIR" || true
+          echo "Space used by TMPDIR (${TMPDIR}):"
+          sudo du -csh "${TMPDIR}" 2>/dev/null || echo "TMPDIR not found or empty"
           echo "Space used by disk images:"
           sudo df -h
           echo "Check which device(s) btrfs is using:"
