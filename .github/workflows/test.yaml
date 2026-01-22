@@ -57,7 +57,7 @@ jobs:
           hatchet-protocol: ${{ matrix.hatchet-protocol }}
           witness-carnage: true
           nix-permission-edict: true
-      - uses: nixbuild/nix-quick-install-action@v30
+      - uses: nixbuild/nix-quick-install-action@v34
       - name: Nix
         run: |
           nix --version
