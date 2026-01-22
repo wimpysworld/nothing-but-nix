@@ -180,4 +180,25 @@ Some Nix installers or configurations expect the `/nix` directory to be writable
 
 When `nix-permission-edict` is set to `true`, the action will run `sudo chown -R "$(id --user)":"$(id --group)" /nix` after mounting `/nix`.
 
+## Troubleshooting 🔍
+
+### "No space left on device" during large builds
+
+If your build runs out of space despite using Nothing but Nix, it's likely because the background purging hasn't completed before your build consumes the available space. This commonly affects:
+
+- NixOS VM tests that assemble large disk images
+- Builds with many dependencies that aren't cached
+- Rust toolchains and other large compilations
+
+**Solution:** Use `witness-carnage: true` to force synchronous purging. This ensures all space is reclaimed *before* your build starts:
+
+```yaml
+- uses: wimpysworld/nothing-but-nix@main
+  with:
+    hatchet-protocol: 'rampage'
+    witness-carnage: true
+```
+
+This adds 30-180 seconds to your workflow setup, but guarantees maximum space is available when your build begins.
+
 Now go and build something amazing with all that glorious Nix store space! ❄️
