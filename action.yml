@@ -171,18 +171,18 @@ runs:
         sudo mount LABEL=nix /nix -o noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120
         sudo df -h
 
+        # Create /nix/build for Nix's build-dir setting
+        sudo mkdir -p /nix/build
+
         if [[ "${{ inputs.nix-permission-edict }}" == "true" ]]; then
           echo "Applying Nix Permission Edict: Granting user ownership of /nix"
           sudo chown -R "$(id --user)":"$(id --group)" /nix
         fi
 
-        # Create a tmp directory within /nix for Nix builds and set TMPDIR
-        # This ensures builds use the large BTRFS volume rather than depleted /mnt
-        TMPNIX="/nix/_tmp"
-        sudo mkdir -p "${TMPNIX}"
+        # Create TMPDIR on /mnt for Nix installer compatibility
+        TMPNIX="$(mktemp --directory --tmpdir=/mnt)"
         sudo chmod 1777 "${TMPNIX}"
         echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
-        echo "TMPDIR set to ${TMPNIX} to use space on the /nix volume for builds."
 
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
