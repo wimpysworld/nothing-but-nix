@@ -378,7 +378,7 @@ runs:
         fi
     - name: The Post
       if: ${{ runner.os }} == 'Linux'
-      uses: srz-zumix/post-run-action@v2
+      uses: srz-zumix/post-run-action@v3
       with:
         shell: bash -e {0}
         post-run: |
