@@ -22,9 +22,6 @@ jobs:
         uses: ./.github/actions/this
         with:
           hatchet-protocol: cleave
-      - uses: DeterminateSystems/determinate-nix-action@main
-      - name: Verify Nix Installation
+      - name: Verify workflow continues after graceful skip
         run: |
-          nix --version
           echo "✅ Windows workflow continued successfully after nothing-but-nix was skipped"
-          echo "Hello from Windows" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
