@@ -393,7 +393,7 @@ runs:
           echo "📈 Background space expansion started. /nix will grow as space becomes available."
         fi
     - name: The Post
-      if: ${{ runner.os }} == 'Linux'
+      if: runner.os == 'Linux'
       uses: srz-zumix/post-run-action@v3
       with:
         shell: bash -e {0}
