@@ -394,7 +394,8 @@ runs:
         fi
     - name: The Post
       if: runner.os == 'Linux'
-      uses: srz-zumix/post-run-action@v3
+      # v3
+      uses: srz-zumix/post-run-action@42756f7452b9439d0365b7e087b2c364f54209c6
       with:
         shell: bash -e {0}
         post-run: |
