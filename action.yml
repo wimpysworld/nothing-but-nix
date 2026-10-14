@@ -204,8 +204,9 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
       shell: bash
       run: |
-        # Nix is often installed in /usr/local, so we need to ensure that it is purged early
-        sudo rmz -f /usr/local
+        # Nix is often installed in /usr/local, so we need to ensure that it is purged early.
+        # Renaming is instant; the contents are deleted in the background by Cleave.
+        sudo mv /usr/local /usr/local.purge
         sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src} || true
     - name: The Purge
       if: steps.environment-check.outputs.is_supported == 'true'
@@ -359,7 +360,8 @@ runs:
             /opt/az \
             /opt/pipx* \
             /opt/google \
-            /opt/mssql-tools
+            /opt/mssql-tools \
+            /usr/local.purge
           echo "Cleave complete" > $expansion_dir/cleave_done
         fi
 
