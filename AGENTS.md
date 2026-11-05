@@ -136,7 +136,7 @@ fi
 Safe havens prevent filesystem exhaustion:
 - `root-safe-haven`: Space reserved on `/` (default: 2048MB)
 - `mnt-safe-haven`: Space reserved on `/mnt` (default: 1024MB)
-- When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved when creating the initial volume
+- When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved during initial volume creation and expansion
 
 Expansion disk is only created if `free_space > (root_safe_haven + 2048)`.
 
@@ -160,7 +160,6 @@ The `/nix` volume grows in two phases:
 Expansion occurs via:
 ```bash
 sudo btrfs device add --nodiscard ${loop_dev} /nix
-sudo btrfs filesystem show
 ```
 
 ### Background Execution
