@@ -14,7 +14,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 - **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS and Windows runners gracefully skip)
 - **Shell**: Bash (embedded in `action.yml`)
-- **Filesystem**: BTRFS with RAID0, zstd compression, loop devices
+- **Filesystem**: BTRFS with single profile (`-d single -m single`), zstd compression, loop devices
 - **Tools**: `rmz` (Fast Unix Commands), Docker CLI, APT, snap
 - **Dependencies**: Standard Ubuntu utilities (`df`, `losetup`, `fallocate`, `mkfs.btrfs`)
 
@@ -136,6 +136,7 @@ fi
 Safe havens prevent filesystem exhaustion:
 - `root-safe-haven`: Space reserved on `/` (default: 2048MB)
 - `mnt-safe-haven`: Space reserved on `/mnt` (default: 1024MB)
+- When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved during initial volume creation and expansion
 
 Expansion disk is only created if `free_space > (root_safe_haven + 2048)`.
 
@@ -159,7 +160,6 @@ The `/nix` volume grows in two phases:
 Expansion occurs via:
 ```bash
 sudo btrfs device add --nodiscard ${loop_dev} /nix
-sudo btrfs balance start -dusage=50 /nix
 ```
 
 ### Background Execution
@@ -171,13 +171,15 @@ By default, purging runs in the background (`witness-carnage: false`):
 
 ### TMPDIR Relocation
 
-The action sets `TMPDIR` to `/mnt` to prevent build failures:
+The action sets `TMPDIR` inside `/nix/tmp` to prevent build failures:
 ```bash
-TMPNIX="$(sudo mktemp --directory --tmpdir=/mnt)"
+sudo mkdir -p /nix/tmp && sudo chmod 1777 /nix/tmp
+TMPNIX="$(sudo mktemp --directory --tmpdir=/nix/tmp)"
+sudo chmod 1777 "${TMPNIX}"
 echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
 ```
 
-This ensures Nix builds use `/mnt` space, not the constrained `/` filesystem.
+This ensures temporary files use the compressed BTRFS `/nix` pool rather than the constrained `/` filesystem or the unallocated `/mnt` safe haven.
 
 ## Contributing
 

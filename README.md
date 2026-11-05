@@ -102,7 +102,7 @@ Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically
 
 1. **Initial Volume Creation (1-10 seconds):** (*depending on Hatchet Protocol*)
    - Creates a loop device from free space on `/mnt`
-   - Sets up a BTRFS filesystem in RAID0 configuration
+   - Sets up a BTRFS filesystem with single data and metadata profiles
    - Mounts with compression and performance tuning
    - Provides a 65GB `/nix` immediately, even before the purge begins
 
@@ -110,7 +110,7 @@ Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically
    - Executes purging operations
    - Monitors for newly freed space as bloat is eliminated
    - Dynamically adds an expansion disk to the `/nix` volume
-   - Rebalances the filesystem to incorporate new space
+   - Makes the new space immediately available in the BTRFS pool
 
 The `/nix` volume automatically **grows during workflow execution** 🎩🪄
 
@@ -165,6 +165,7 @@ Control how much space to spare from the Nix store land grab with custom safe ha
 These safe havens define how much space (in MB) will be mercifully spared during space reclamation:
 - Default `root-safe-haven` is 2048MB (2GB)
 - Default `mnt-safe-haven` is 1024MB (1GB)
+- When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved
 
 Increase these values if you need more breathing room on your filesystems, or decrease them to show no mercy! 😈
 
