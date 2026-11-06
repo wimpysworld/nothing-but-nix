@@ -178,14 +178,14 @@ runs:
       run: |
         # rmz from Fast Unix Commands, pinned to one release. Check the
         # download against the SHA-256 of the release asset before use.
-        RMZ_VERSION="3.0.1"
+        RMZ_VERSION="3.2.1"
         ARCH=$(uname -m)
         if [[ "$ARCH" == "x86_64" ]]; then
           URL_ARCH="x86_64"
-          RMZ_SHA256="54f643c6ba170d613c65c48697000faf68d9c77611c10458ea5b1eac99799d25"
+          RMZ_SHA256="e2c2c07e731d9422dfe3f14e17e010c6dd5f7a4ad54a9c9bcd141cb8a5ec4fb1"
         elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
           URL_ARCH="aarch64"
-          RMZ_SHA256="af6e636d4d25f3cbf14b0e50dc1f13ee032dc4ff6109604aefcb2151edc4ba39"
+          RMZ_SHA256="62059f80a71715d6c4197c0729f157a9c1bbe537a5bdfa830397c47b3ae1ed74"
         else
           echo "::error::Unsupported architecture for rmz: $ARCH"
           exit 1
