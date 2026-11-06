@@ -129,43 +129,96 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 
 #### Protocol Comparison ⚖️
 
-| Protocol | `/nix` x64 | `/nix` arm64 | Time to next step | Purge time (foreground) | Removes | Keeps | Changes packages | Docker afterwards | Can break in a later step |
-|----------|------------|--------------|-------------------|-------------------------|---------|-------|------------------|-------------------|---------------------------|
-| Holster | ~75-78GiB | ~96GiB | 1-3 seconds | No purge | Nothing. `/nix` uses the free space of `/mnt` only | Everything on the runner image | No | Works | Nothing |
-| Carve | ~100-108GiB | ~110GiB | About 2 seconds, or 19-86 seconds with `witness-carnage: true` | 17-84 seconds | Rust (`~/.rustup`, `~/.cargo`), GHC (`/opt/ghc`, `/usr/local/.ghcup`), the Android SDK (`/usr/local/lib/android`), .NET (`/usr/share/dotnet`), Swift (`/usr/share/swift`), and the tool cache (`/opt/hostedtoolcache`). It deletes each path only when no dpkg package owns it | Docker and its images, snap, every apt package, browsers, JDKs, databases, LLVM, and the rest of `/usr/local` | No. Carve runs no apt or dpkg command | Works | A step that uses the preinstalled Rust, GHC, Android SDK, .NET, or Swift. A `setup-*` action that expects a version in the tool cache must download it |
-| Cleave | ~114-122GiB | ~122GiB | About 2 seconds, or 42-135 seconds with `witness-carnage: true` | 41-133 seconds | Everything that Carve removes, plus all of `/usr/local` (the action creates it again, empty), `~/.dotnet`, pipx (`/opt/pipx*`), Docker images, containers, and data (`/var/lib/docker`, `/var/lib/containerd`), the `docker*` and `snapd` packages, every snap, `/opt/az` (Azure CLI), `/opt/google` (Chrome), `/opt/microsoft` (Edge and PowerShell), `/opt/mssql-tools`, `/opt/containerd`, and the packages that `apt-get autoremove` finds unused | Every other apt package that does not depend on a `docker*` or `snapd` package and that `apt-get autoremove` does not find unused, including JDKs, Firefox, databases, Clang and LLVM, PHP, Ruby, and fonts | Yes. One `apt-get remove --purge --autoremove` call, then `apt-get clean`. It adds `/etc/dpkg/dpkg.cfg.d/01_nocruft`, so later package installs skip documentation, fonts, icons, info, and man pages. The `/opt` deletions remove files that dpkg packages own, and dpkg still lists those packages as installed | No. The purge stops `docker.socket`, `docker.service`, and `containerd.service`, deletes the data, and removes the Docker packages | Docker and Docker Compose, snaps, tools in `/usr/local`, pipx tools, Chrome, Edge, PowerShell, and Azure CLI. A later `apt-get install` of a font package installs no font files |
-| Rampage | ~123-129GiB | ~128-129GiB | About 2 seconds, or 103-214 seconds with `witness-carnage: true` | 101-212 seconds | Everything that Cleave removes, plus these apt package groups and the packages that depend on them: .NET (`dotnet-*`, `aspnetcore-*`), Java (`java*`), Kotlin, Gradle, Clang and LLVM, GNU Fortran, Firefox, Edge, the `google-*` packages (for example Chrome), databases (MySQL, PostgreSQL, MongoDB, SQL Server tools), Apache and nginx, PHP, Ruby, R, Mono, PowerShell, Azure CLI, kubectl, container tools (Podman, Buildah, Skopeo, containerd, CNI plugins), fonts, Mesa, GTK, x265, Vim, TeX, Tcl and Tk, Mercurial, MeCab, MediaInfo, man-db, fwupd, byobu, and the Python Babel and boto packages. It also deletes Heroku, Maven (`/usr/share/apache-*`), the Azure PowerShell modules (`/usr/share/az_*`), Gradle, Kotlin, Miniconda, sbt, `/usr/share/java`, Tcl and Tk data, Texinfo, Ruby gems, the MySQL data, the Ubuntu Pro state (`/var/lib/ubuntu-advantage`), and every file in `/usr/share/doc`, `/usr/share/fonts`, `/usr/share/icons`, `/usr/share/info`, and `/usr/share/man` | The apt packages that are not in the Rampage list, do not depend on a package in it or on a `docker*` or `snapd` package, and that `apt-get autoremove` does not find unused, for example Git, GCC, and curl | Yes. The same `apt-get` call as Cleave, with the Rampage list added. The `/usr/share` deletions also remove files that dpkg packages own | No, as with Cleave | Everything that Cleave breaks, plus a step that needs Java, Kotlin, Gradle, Maven, or sbt, Clang or LLVM, a browser, a database service, PHP, Ruby, R, Mono, kubectl, fonts, or man pages |
+| Protocol | Linux `/nix` | macOS free space | Ready in | Use it when |
+|----------|--------------|------------------|----------|-------------|
+| Holster | ~76GiB | ~96GiB | ~2s | You need every tool on the runner |
+| Carve | ~105GiB | ~123GiB | ~2s | You want space fast and keep apt, Docker and Xcode |
+| Cleave (default) | ~120GiB | ~269GiB | ~2s | You want a balance of space and tools |
+| Rampage | ~129GiB | ~282GiB | ~2s | You need maximum space and don't care what breaks `#nix-is-life` |
 
-The sizes and times come from [CI run 42232707314](https://github.com/wimpysworld/nothing-but-nix/actions/runs/42232707314) on public GitHub-hosted runners in November 2026. Time to next step is the time before the next workflow step can start. With the default `witness-carnage: false` it is the time of the action step, and with `witness-carnage: true` it includes the full purge. Purge time is the time for the purge to finish with `witness-carnage: true`.
+Public x64 Linux and `macos-26` runners, November 2026. Holster removes nothing and breaks nothing.
 
-Choose wisely:
-- **Holster** when you need the runner's tools to remain fully functional
-- **Carve** for a fast purge that deletes only the large toolchains that dpkg does not own (Android SDK, .NET, GHC, Swift, Rust, and the tool cache) and leaves apt, Docker, and snap alone
-- **Cleave** (*default*) for a good balance of space and functionality
-- **Rampage** when you need maximum Nix space and don't care what breaks `#nix-is-life`
+<details>
+<summary>🔪 What Carve removes</summary>
 
-The `/nix` sizes are the available space observed on public GitHub-hosted runners in November 2026, and they change when GitHub updates the runner images. Btrfs `zstd:1` compression lets the store hold more than these raw sizes. On x64, Cleave and Rampage add about 38-53GiB over Holster. Private repositories get smaller disks, so expect less.
+**Removes**
+- Linux: Rust, GHC, the Android SDK, .NET, Swift and the tool cache, but only the paths that no dpkg package owns
+- macOS: the tool cache, the Android SDK, .NET, GHCup, Mono and Xamarin
 
-GitHub does not guarantee a separate `/mnt` disk. On current images `/` and `/mnt` share one disk, so Holster takes the free space of that disk through `/mnt`. On these single-disk runners, Carve gains its extra space from the fast purge, not from `/mnt`.
+**Keeps**
+- Linux: Docker, snap, every apt package, the browsers, JDKs, databases and LLVM
+- macOS: every Xcode, the simulators, Homebrew, Rust and the browsers
+
+**Breaks**
+- Steps that use the preinstalled toolchains above
+- `setup-*` actions must download what the tool cache held
+
+</details>
+
+<details>
+<summary>🪓 What Cleave removes</summary>
+
+**Removes**
+- Linux: everything Carve removes, plus all of `/usr/local`, pipx, Docker and its data, snapd and every snap, Azure CLI, Chrome, Edge, PowerShell, the SQL Server tools, and the apt packages that depend on them or that nothing needs any more
+- macOS: everything Carve removes, plus every simulator runtime, every Xcode except the default, `~/Library/Developer`, `~/Library/Caches` and Rust
+
+**Keeps**
+- Linux: the other apt packages, including JDKs, Firefox, databases, Clang and LLVM, PHP, Ruby and fonts
+- macOS: the default Xcode, Homebrew and the browsers
+
+**Breaks**
+- Linux: Docker and Docker Compose, snaps, tools in `/usr/local`, pipx tools, Chrome, Edge, PowerShell and Azure CLI. Later apt installs skip docs, fonts, icons and man pages
+- macOS: other Xcode versions, the simulators and Rust
+
+</details>
+
+<details>
+<summary>💥 What Rampage destroys</summary>
+
+**Removes**
+- Linux: everything Cleave removes, plus .NET, Java, Kotlin, Gradle, Maven, sbt, Clang and LLVM, GNU Fortran, the browsers, the databases, Apache and nginx, PHP, Ruby, R, Mono, kubectl, Podman and friends, Miniconda, Heroku, fonts, TeX, and the docs, icons and man pages in `/usr/share`
+- macOS: everything Cleave removes, plus the default Xcode, CoreSimulator, Homebrew and the browsers
+
+**Keeps**
+- Linux: the core apt packages, for example Git, GCC and curl
+- macOS: the Command Line Tools, so `git`, `clang` and `make` still work
+
+**Breaks**
+- Linux: everything Cleave breaks, plus any step that needs the toolchains, browsers, databases, fonts or man pages above
+- macOS: everything Cleave breaks, plus `xcodebuild`, Swift from Xcode, `brew` and every Homebrew tool, and `nix-quick-install-action`, which needs `gtar` from Homebrew. `shell: bash` falls back to `/bin/bash` 3.2
+
+</details>
+
+<details>
+<summary>📏 The numbers</summary>
+
+| Runner | Holster | Carve | Cleave | Rampage |
+|--------|---------|-------|--------|---------|
+| Linux x64 `/nix` | 75-78GiB | 100-108GiB | 114-122GiB | 123-129GiB |
+| Linux arm64 `/nix` | 96GiB | 110GiB | 122GiB | 128-129GiB |
+| `macos-15` free space | 46GiB | 72GiB | 224GiB | 238GiB |
+| `macos-26` free space | 96-97GiB | 123GiB | 269GiB | 282GiB |
+| `xcode-27` (macOS 27 preview) free space | not tested | not tested | not tested | 140GiB |
+
+- Measured on public GitHub-hosted runners in November 2026, in [CI run 42232707314](https://github.com/wimpysworld/nothing-but-nix/actions/runs/42232707314) for Linux and [CI run 42250616191](https://github.com/wimpysworld/nothing-but-nix/actions/runs/42250616191) for macOS. The sizes change when GitHub updates the runner images.
+- Private repositories get smaller runners, so expect less.
+- On Linux, `zstd:1` compression lets the store hold more than these raw sizes.
+- GitHub no longer guarantees a separate `/mnt` disk. On current images `/` and `/mnt` share one disk.
+
+</details>
 
 ### macOS on Apple silicon 🍎
 
-macOS does things differently. Every volume on the runner shares one APFS container, so there is no Btrfs pool to grow. The action frees space on the Data volume (`/System/Volumes/Data`), and the Nix installer then creates its own `Nix Store` APFS volume from that free space. The action never creates that volume itself, because the Determinate installer refuses to install over an existing one.
+macOS has no Btrfs pool, so the action frees space on the Data volume and the Nix installer builds its own `Nix Store` volume from it. The Command Line Tools always survive, so `git` and `actions/checkout` keep working.
 
-The purge moves each target into `/private/var/tmp/nothing-but-nix.staging`, which is instant on the same volume, then deletes the staging directory with `rmz`. With the default `witness-carnage: false`, the delete runs in the background and the next step starts at once. Paths that do not exist are skipped. The Command Line Tools (`/Library/Developer/CommandLineTools`) always survive, so `/usr/bin/git` and `actions/checkout` keep working.
+<details>
+<summary>🍎 macOS notes</summary>
 
-| Protocol | Data volume gained | Purge time (foreground) | Removes | Keeps | Can break in a later step |
-|----------|--------------------|-------------------------|---------|-------|---------------------------|
-| Holster | Nothing | No purge | Nothing. The action reports the free space of the Data volume | Everything on the runner image | Nothing |
-| Carve | ~25-26GiB | 25-31 seconds | The tool cache (`/Users/runner/hostedtoolcache`), the Android SDK (`~/Library/Android/sdk`), .NET (`/usr/local/share/dotnet`, `~/.dotnet`), GHCup (`~/.ghcup`), Mono (`/Library/Frameworks/Mono.framework`), and Xamarin (`/Library/Frameworks/Xamarin*`) | Every Xcode, the simulator runtimes, Homebrew, Rust, and the browsers | A step that uses the preinstalled Android SDK, .NET, GHC, Mono, or Xamarin. A `setup-*` action that expects a version in the tool cache must download it |
-| Cleave | ~172-180GiB | 220-333 seconds | Everything that Carve removes, plus every simulator runtime (`xcrun simctl runtime delete all`), every `/Applications/Xcode*.app` except the default one that `xcode-select -p` points at, `~/Library/Developer`, `~/Library/Caches`, and Rust (`~/.rustup`, `~/.cargo`) | The default Xcode, Homebrew, and the browsers | Everything that Carve breaks, plus a step that needs another Xcode version, a simulator, or the preinstalled Rust |
-| Rampage | ~186-192GiB | 127-393 seconds | Everything that Cleave removes, plus the default Xcode, `/Library/Developer/CoreSimulator`, Homebrew (`/opt/homebrew`), Google Chrome, Firefox, and Microsoft Edge. Then `xcode-select` switches to the Command Line Tools | The Command Line Tools, so `git`, `clang`, and `make` still work | Everything that Cleave breaks, plus `xcodebuild`, Swift from Xcode, `brew` and every Homebrew tool (for example `gh`, `jq`, and `yq`), `nix-quick-install-action`, which needs `gtar` from Homebrew, and the browsers. `shell: bash` steps fall back to the macOS `/bin/bash` 3.2 |
+- Intel Macs are not supported, and the action skips them.
+- `root-safe-haven`, `mnt-safe-haven`, `nix-permission-edict` and `btrfs-compression` do nothing on macOS.
+- The `xcode-27` runner (the macOS 27 preview) is tested, but its result never blocks a merge.
 
-The sizes and times come from [CI run 42250616191](https://github.com/wimpysworld/nothing-but-nix/actions/runs/42250616191) on public GitHub-hosted runners in November 2026, and they change with the runner image. Data volume gained is the growth of free space on `/System/Volumes/Data`. Before the purge, `macos-15` has about 44-46GiB free and `macos-26` about 96-98GiB. Rampage takes `macos-15` to about 238GiB free and `macos-26` to about 282GiB. With the default `witness-carnage: false`, the action step takes about 2 seconds, and the Rampage purge on `macos-26` finishes in the background in about 166 seconds.
-
-Some inputs make no sense on macOS. `root-safe-haven`, `mnt-safe-haven`, `nix-permission-edict`, and `btrfs-compression` do nothing there, and each prints one notice when you set it to anything but its default. The action does not create `/nix/build` and does not set `TMPDIR` on macOS.
-
-The `xcode-27` runner (the macOS 27 preview) gets a Rampage test too, but it is a preview, so its result never blocks a merge. In the same run, Rampage took it from about 37GiB to about 140GiB free in 119 seconds.
+</details>
 
 ### Witness The Carnage 🩸
 
