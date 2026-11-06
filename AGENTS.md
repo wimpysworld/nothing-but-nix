@@ -29,9 +29,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
     ├── actionlint.yaml     # Runner labels that actionlint does not know yet
     ├── scripts/            # Checks that the test jobs run after the action
     └── workflows/
-        ├── test.yaml       # Integration tests with multiple Nix installers (Ubuntu)
-        ├── test-macos.yaml # macOS guard rail validation tests
-        ├── test-windows.yaml # Windows guard rail validation tests
+        ├── test.yaml       # Integration tests with multiple Nix installers, and skip tests on macOS and Windows
         └── debug.yaml      # Debugging workflow for space usage analysis
 ```
 
@@ -122,6 +120,8 @@ After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`
 Each floor is about 10% under the lowest available space observed on public runners in November 2026 (CI run 42225007501, with a 2 GiB root safe haven), less the extra space that `root-safe-haven: auto` reserves: 8 GiB for holster and carve, and 4 GiB for cleave and rampage. The floors come from that calculation, not from a run with `auto`, so check them against the first CI run with `auto` and correct them. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
 
 The `ubuntu-slim` job runs the action on `ubuntu-slim`, an unprivileged container runner with no loop devices and no mount support. It checks that the action skips, that the outputs are empty, and that `/nix` is not a Btrfs mount. The `👁️ Sentinel` job needs this job too.
+
+The `unsupported-os` job runs the action on `macos-latest` and `windows-latest`. It checks that the workflow continues, that the outputs are empty, and that `/nix` does not exist before Nix is installed. On macOS it then installs Nix with `DeterminateSystems/determinate-nix-action` and runs `neo-cowsay`. The `👁️ Sentinel` job needs this job too.
 
 The `background-purge` job runs the action with `witness-carnage: false` for carve, cleave, and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check with the floor for the protocol of the job. The `👁️ Sentinel` job needs this job too.
 
