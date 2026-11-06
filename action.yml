@@ -957,6 +957,28 @@ runs:
           done
         }
 
+        # Delete the staging directory. On APFS, readdir can stop early when
+        # entries are deleted during the walk, so rmz can fail with
+        # "Directory not empty". Delete again, then clear the file flags and
+        # delete once more. Report what stays, but do not fail the purge.
+        function delete_staging() {
+          echo "Deleting ${staging}"
+          sudo rmz -f "${staging}" || true
+          if [[ -e "${staging}" ]]; then
+            echo "Deleting ${staging} again"
+            sudo rmz -f "${staging}" || true
+          fi
+          if [[ -e "${staging}" ]]; then
+            echo "Clearing the file flags in ${staging}"
+            sudo chflags -R nouchg,noschg "${staging}" || true
+            sudo rmz -f "${staging}" || true
+          fi
+          if [[ -e "${staging}" ]]; then
+            echo "::warning::rmz could not delete all of ${staging}, so these paths stay"
+            sudo du -h -d 1 "${staging}" || true
+          fi
+        }
+
         # Delete the simulator runtimes, move the late targets, and delete
         # the staging directory. A caller in an || list turns off set -e
         # here, so check each essential command.
@@ -978,11 +1000,7 @@ runs:
             fi
           fi
           if [[ "${PROTOCOL_LEVEL}" -ge 1 ]]; then
-            echo "Deleting ${staging}"
-            if ! sudo rmz -f "${staging}"; then
-              echo "::error::rmz could not delete ${staging}"
-              return 1
-            fi
+            delete_staging
           fi
           echo "Free space of /System/Volumes/Data: $(data_free_bytes) bytes"
           echo "Everything completed" > "${expansion_dir}/all_done"
