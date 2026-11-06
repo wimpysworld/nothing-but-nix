@@ -34,26 +34,7 @@ jobs:
           hatchet-protocol: ${{ matrix.hatchet-protocol }}
           witness-carnage: true
       - name: Check TMPDIR
-        run: |
-          if [[ -z "${TMPDIR:-}" ]]; then
-            echo "::error::TMPDIR is not set"
-            exit 1
-          fi
-          if ! tmpdir_real="$(realpath -e "${TMPDIR}")"; then
-            echo "::error::TMPDIR (${TMPDIR}) does not exist"
-            exit 1
-          fi
-          case "${tmpdir_real}" in
-            /nix|/nix/*)
-              echo "::error::TMPDIR (${tmpdir_real}) must stay outside /nix because the Nix multi-user installer runs chown -R root:nixbld /nix (#57)"
-              exit 1
-              ;;
-          esac
-          if [[ ! -d "${tmpdir_real}" || ! -w "${tmpdir_real}" ]]; then
-            echo "::error::TMPDIR (${tmpdir_real}) is not a directory that $(id --user --name) can write to"
-            exit 1
-          fi
-          echo "TMPDIR is ${tmpdir_real}"
+        run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
       - uses: DeterminateSystems/determinate-nix-action@main
       - name: Nix
         run: |
@@ -84,26 +65,7 @@ jobs:
           witness-carnage: true
           nix-permission-edict: true
       - name: Check TMPDIR
-        run: |
-          if [[ -z "${TMPDIR:-}" ]]; then
-            echo "::error::TMPDIR is not set"
-            exit 1
-          fi
-          if ! tmpdir_real="$(realpath -e "${TMPDIR}")"; then
-            echo "::error::TMPDIR (${TMPDIR}) does not exist"
-            exit 1
-          fi
-          case "${tmpdir_real}" in
-            /nix|/nix/*)
-              echo "::error::TMPDIR (${tmpdir_real}) must stay outside /nix because the Nix multi-user installer runs chown -R root:nixbld /nix (#57)"
-              exit 1
-              ;;
-          esac
-          if [[ ! -d "${tmpdir_real}" || ! -w "${tmpdir_real}" ]]; then
-            echo "::error::TMPDIR (${tmpdir_real}) is not a directory that $(id --user --name) can write to"
-            exit 1
-          fi
-          echo "TMPDIR is ${tmpdir_real}"
+        run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
       - uses: nixbuild/nix-quick-install-action@v35
       - name: Nix
         run: |
@@ -135,26 +97,7 @@ jobs:
           witness-carnage: true
           nix-permission-edict: ${{ matrix.nix-permission-edict }}
       - name: Check TMPDIR
-        run: |
-          if [[ -z "${TMPDIR:-}" ]]; then
-            echo "::error::TMPDIR is not set"
-            exit 1
-          fi
-          if ! tmpdir_real="$(realpath -e "${TMPDIR}")"; then
-            echo "::error::TMPDIR (${TMPDIR}) does not exist"
-            exit 1
-          fi
-          case "${tmpdir_real}" in
-            /nix|/nix/*)
-              echo "::error::TMPDIR (${tmpdir_real}) must stay outside /nix because the Nix multi-user installer runs chown -R root:nixbld /nix (#57)"
-              exit 1
-              ;;
-          esac
-          if [[ ! -d "${tmpdir_real}" || ! -w "${tmpdir_real}" ]]; then
-            echo "::error::TMPDIR (${tmpdir_real}) is not a directory that $(id --user --name) can write to"
-            exit 1
-          fi
-          echo "TMPDIR is ${tmpdir_real}"
+        run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
       - uses: cachix/install-nix-action@v31
       - name: Nix
         run: |
