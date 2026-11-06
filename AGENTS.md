@@ -96,6 +96,8 @@ The `test.yaml` workflow validates:
   - nixbuild/nix-quick-install-action (requires `nix-permission-edict: true`)
   - cachix/install-nix-action (requires `nix-permission-edict: true`)
 
+After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`. The script checks that `/nix` is a Btrfs mount, that it is writable, and that its available space is at or above the floor for the protocol: 75 GiB for holster and carve, 104 GiB for cleave, and 114 GiB for rampage. The floors are about 10% under the space observed on public x64 runners. On arm64 runners the space is not yet known, so the script applies the holster floor for every protocol. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
+
 ### Verification Commands
 
 After running the action, verify success with:

@@ -35,6 +35,10 @@ jobs:
           witness-carnage: true
       - name: Check TMPDIR
         run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
+      - name: Check /nix volume
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+        run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
       - uses: DeterminateSystems/determinate-nix-action@main
       - name: Nix
         run: |
@@ -66,6 +70,10 @@ jobs:
           nix-permission-edict: true
       - name: Check TMPDIR
         run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
+      - name: Check /nix volume
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+        run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
       - uses: nixbuild/nix-quick-install-action@v35
       - name: Nix
         run: |
@@ -98,6 +106,10 @@ jobs:
           nix-permission-edict: ${{ matrix.nix-permission-edict }}
       - name: Check TMPDIR
         run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
+      - name: Check /nix volume
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+        run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
       - uses: cachix/install-nix-action@v31
       - name: Nix
         run: |
