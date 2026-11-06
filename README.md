@@ -107,7 +107,7 @@ Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically
    - Mounts with compression and performance tuning
    - Provides about 83-86GiB of `/nix` on x64 (104GiB on arm64) immediately, even before the purge begins
 
-2. **Background Expansion:** (*14-82 seconds for Carve, 36-108 for Cleave, 111-235 for Rampage*)
+2. **Background Expansion:** (*the purge took 14-82 seconds for Carve, 36-108 for Cleave, and 111-235 for Rampage in foreground test runs, and 71-91 seconds for Cleave and 173-185 for Rampage in the default background mode*)
    - Executes purging operations
    - Monitors for newly freed space as bloat is eliminated
    - Dynamically adds an expansion disk to the `/nix` volume
