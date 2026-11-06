@@ -15,7 +15,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 - **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS and Windows runners gracefully skip)
 - **Shell**: Bash (embedded in `action.yml`)
 - **Filesystem**: BTRFS with single profile (`-d single -m single`), zstd compression, loop devices
-- **Tools**: `rmz` (Fast Unix Commands), Docker CLI, APT, snap
+- **Tools**: `rmz` (Fast Unix Commands), `systemctl`, APT, snap
 - **Dependencies**: Standard Ubuntu utilities (`df`, `losetup`, `fallocate`, `mkfs.btrfs`)
 
 ## Project Structure
@@ -180,7 +180,7 @@ For cleave and rampage, the purge runs in this order:
 
 1. `fast_trees` lists the large trees for the protocol, and `unowned_paths` keeps only the paths that no dpkg package owns (`dpkg-query --search`). `rmz_parallel` deletes them, one `rmz` per path in parallel.
 2. `add_expansion_disk` grows `/nix`.
-3. Docker, snap, and apt work, then the Cleave and Rampage `rmz` lists. These lists still name the fast trees, and `rmz -f` ignores the paths that are already gone.
+3. Docker, snap, and apt work, then the Cleave and Rampage `rmz` lists. These lists still name the fast trees, and `rmz -f` ignores the paths that are already gone. The Docker phase stops `docker.socket`, `docker.service`, and `containerd.service` when they are loaded, then deletes `/var/lib/docker` and `/var/lib/containerd` with `rmz`. Docker 29 on Ubuntu 26.04 keeps its images in `/var/lib/containerd`. Do not delete these directories while the daemons run.
 4. `add_expansion_disk` grows `/nix` again.
 
 `add_expansion_disk` sizes each disk image as the current free space of `/` less the safe haven, and does nothing when the free space is not more than the safe haven plus 2048 MB. Expansion occurs via:

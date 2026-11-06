@@ -428,14 +428,23 @@ runs:
           add_expansion_disk
         fi
 
-        # Cleanse docker
+        # Cleanse docker. Stop the daemons, then delete their data in one
+        # pass. Docker 29 on Ubuntu 26.04 keeps images in /var/lib/containerd,
+        # older images keep them in /var/lib/docker.
         if [[ "${protocol_level}" -ge 2 ]]; then
-          for CRUFT in $(docker image ls --format '{{.ID}}'); do
-            docker rmi --force "${CRUFT}" || true
+          docker_units=()
+          for unit in docker.socket docker.service containerd.service; do
+            if [[ "$(systemctl show --property=LoadState --value "${unit}")" == "loaded" ]]; then
+              docker_units+=("${unit}")
+            fi
           done
-          docker system prune --all --force
+          if [[ "${#docker_units[@]}" -gt 0 ]]; then
+            echo "Stopping ${docker_units[*]}"
+            sudo systemctl stop "${docker_units[@]}"
+          fi
+          rmz_parallel /var/lib/docker /var/lib/containerd
           remove_packages 'docker.*'
-          sudo rmz -f /usr/bin/docker* /var/lib/docker
+          sudo rmz -f /usr/bin/docker*
           echo "Cleanse docker complete" > "${expansion_dir}/docker_done"
         fi
 
@@ -556,7 +565,6 @@ runs:
             /usr/share/swift \
             /usr/share/tcltk \
             /usr/share/texinfo \
-            /var/lib/containerd \
             /var/lib/gems \
             /var/lib/mysql \
             /var/lib/ubuntu-advantage
