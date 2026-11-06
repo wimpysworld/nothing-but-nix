@@ -203,10 +203,40 @@ jobs:
         env:
           HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
         run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
+  ubuntu-slim:
+    name: unsupported container runner on ubuntu-slim
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        id: purge
+        uses: ./.github/actions/this
+        with:
+          witness-carnage: true
+      - name: Check that the workflow continues
+        env:
+          NIX_SIZE_BYTES: ${{ steps.purge.outputs.nix-size-bytes }}
+          ROOT_FREE_BYTES: ${{ steps.purge.outputs.root-free-bytes }}
+        run: |
+          if [[ -n "${NIX_SIZE_BYTES}" || -n "${ROOT_FREE_BYTES}" ]]; then
+            echo "::error::The action did not skip on ubuntu-slim, because its outputs are not empty"
+            exit 1
+          fi
+          fstype="$(findmnt -n -o FSTYPE --mountpoint /nix 2>/dev/null | tail -n 1 || true)"
+          if [[ "${fstype}" == "btrfs" ]]; then
+            echo "::error::/nix is a Btrfs mount on ubuntu-slim, so the action did not skip"
+            exit 1
+          fi
+          echo "The action skipped on ubuntu-slim and the workflow continues"
   sentinel:
     name: "👁️ Sentinel"
     if: always()
-    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge]
+    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, ubuntu-slim]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
