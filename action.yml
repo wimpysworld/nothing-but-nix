@@ -384,7 +384,7 @@ runs:
 
         # Print the given paths that exist and that no dpkg package owns.
         function unowned_paths() {
-          local existing=() owned="" path search_status=0
+          local existing=() line owned="" owned_paths="" path search_status=0
           for path in "$@"; do
             if [[ -e "${path}" ]]; then
               existing+=("${path}")
@@ -395,15 +395,27 @@ runs:
           fi
           # dpkg-query exits 1 when a path has no owner, which is expected
           # here, and 2 on a fatal error. Each output line is
-          # "package[, package]: path".
+          # "package[:arch][, package[:arch]]: path" or
+          # "diversion by package from|to: path". The owner part never
+          # contains ": ", so the path starts after the first ": ".
           owned="$(dpkg-query --search "${existing[@]}" 2>/dev/null)" || search_status=$?
           if [[ "${search_status}" -gt 1 ]]; then
             echo "dpkg-query failed with status ${search_status}, so no path counts as unowned" >&2
             return 0
           fi
-          owned="$(sed -n 's/^[^:]*: //p' <<< "${owned}")"
+          while IFS= read -r line; do
+            if [[ -z "${line}" ]]; then
+              continue
+            fi
+            path="${line#*: }"
+            if [[ "${path}" == "${line}" || "${path}" != /* ]]; then
+              echo "dpkg-query printed an unexpected line, so no path counts as unowned: ${line}" >&2
+              return 0
+            fi
+            owned_paths+="${path}"$'\n'
+          done <<< "${owned}"
           for path in "${existing[@]}"; do
-            if ! grep -qxF -- "${path}" <<< "${owned}"; then
+            if ! grep -qxF -- "${path}" <<< "${owned_paths}"; then
               echo "${path}"
             fi
           done
