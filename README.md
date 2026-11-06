@@ -63,7 +63,7 @@ jobs:
 - Only supports official **Ubuntu** GitHub Actions runners
   - Tested on Ubuntu 22.04, 24.04 and 26.04 on x64, and on Ubuntu 24.04 and 26.04 on arm64
 - Must run **before** Nix is installed
-- **macOS/Darwin runners**: This action will gracefully skip with a warning if run on macOS. macOS runners already provide sufficient space for Nix and do not require this action
+- **macOS/Darwin runners**: This action will gracefully skip with a warning if run on macOS. macOS runners are not supported yet. `macos-14` and `macos-15` runners can start with only 40 to 47 GB free, so a large Nix store can still run out of space there
 - **Windows runners**: This action will gracefully skip with a warning if run on Windows. Windows runners have different filesystem layouts and constraints
 - **Container runners such as `ubuntu-slim`**: This action will gracefully skip with a warning when the runner has no loop devices. The action checks that `/dev/loop-control` exists and that `sudo -n losetup --find` succeeds. `ubuntu-slim` is an unprivileged container with no loop devices and no mount support, so a later Nix install uses the container disk as it is
 

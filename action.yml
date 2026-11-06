@@ -52,7 +52,7 @@ runs:
         if [[ "${{ runner.os }}" == "macOS" ]]; then
           echo "is_supported=false" >> $GITHUB_OUTPUT
           echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
-          echo "ℹ️  macOS/Darwin runners do not require this action - they already provide sufficient space for Nix."
+          echo "ℹ️  macOS/Darwin runners are not supported yet. They can start with only 40 to 47 GB free, so a large Nix store can still run out of space."
           echo "ℹ️  This action will be skipped and your workflow will continue normally."
           exit 0
         fi
