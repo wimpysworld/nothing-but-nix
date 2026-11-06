@@ -369,7 +369,9 @@ runs:
         # Print the large trees for this protocol that dpkg does not own. The
         # purge deletes these first, so that /nix grows before the slower
         # Docker and apt work. A path that dpkg owns waits for the later
-        # phases, which delete it as before.
+        # phases, which delete it only when the Cleave or Rampage rmz list
+        # names it. /opt/ghc and /usr/share/dotnet are in this list only, so
+        # the purge never deletes them behind dpkg's back.
         function fast_trees() {
           local trees=()
           shopt -s nullglob
@@ -378,9 +380,12 @@ runs:
               "${HOME}/.rustup"
               "${HOME}/.cargo"
               "${HOME}/.dotnet"
+              /opt/ghc
               /opt/hostedtoolcache
               /opt/pipx*
               /usr/local.purge
+              /usr/share/dotnet
+              /usr/share/swift
             )
           fi
           if [[ "${protocol_level}" -ge 3 ]]; then
@@ -392,7 +397,6 @@ runs:
               /usr/share/kotlinc
               /usr/share/miniconda
               /usr/share/sbt
-              /usr/share/swift
             )
           fi
           shopt -u nullglob
