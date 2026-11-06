@@ -98,6 +98,8 @@ The `test.yaml` workflow validates:
 
 After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`. The script checks that `/nix` is a Btrfs mount, that it is writable, and that its available space is at or above the floor for the protocol: 75 GiB for holster and carve, 104 GiB for cleave, and 114 GiB for rampage. The floors are about 10% under the space observed on public x64 runners. On arm64 runners the space is not yet known, so the script applies the holster floor for every protocol. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
 
+The `background-purge` job runs the action with `witness-carnage: false` for cleave and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check. The `👁️ Sentinel` job needs this job too.
+
 ### Verification Commands
 
 After running the action, verify success with:
