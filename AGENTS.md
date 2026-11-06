@@ -27,7 +27,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 ├── LICENSE                 # MIT licence
 └── .github/
     ├── actionlint.yaml     # Runner labels that actionlint does not know yet
-    ├── scripts/            # Checks that the test jobs run after the action
+    ├── scripts/            # Checks that the test jobs run after the action, and lint.sh
     └── workflows/
         ├── test.yaml       # Integration tests with multiple Nix installers, and skip tests on macOS and Windows
         └── debug.yaml      # Debugging workflow for space usage analysis
@@ -80,6 +80,16 @@ The `btrfs-compression` input sets the `compress` mount option of the pool. The 
 - **Disk images**: `/mnt/disk${loop_num}.img` (initial) and `/disk${loop_num}.img` (expansion)
 
 ## Testing
+
+### Linting
+
+Run the lint script before you push. It needs no `just` recipe:
+
+```bash
+nix develop --command .github/scripts/lint.sh
+```
+
+The script runs `actionlint` on the workflows, `shellcheck` on `.github/scripts/*.sh`, and `shellcheck` on each Bash body in `action.yml`, including the `post-run` body of The Post. It uses `yq` to extract each body, replaces each `${{ ... }}` expression with the variable `${GHA_EXPR}`, and exports the names in the step `env` map. Each finding names its line in `action.yml`. The substitution causes no finding, so the script excludes no code for it. The script drops only SC2086 on an unquoted `$GITHUB_OUTPUT` or `$GITHUB_ENV`, which `action.yml` uses as redirect targets. SC2086 on any other word still fails. The `lint` job in `test.yaml` runs the same script with `actionlint` 1.7.12, pinned by SHA-256, and the `shellcheck` and `yq` of the `ubuntu-24.04` runner image. The `👁️ Sentinel` job needs this job too.
 
 ### Manual Testing
 

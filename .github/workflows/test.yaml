@@ -277,10 +277,42 @@ jobs:
         run: |
           nix --version
           echo "Hello from macOS" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: '1.7.12'
+          # From actionlint_1.7.12_checksums.txt in the release
+          ACTIONLINT_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8'
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          actionlint_dir="$(mktemp --directory)"
+          curl --fail --silent --show-error --location --retry 3 \
+            -o "${actionlint_dir}/${tarball}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          if ! echo "${ACTIONLINT_SHA256}  ${actionlint_dir}/${tarball}" | sha256sum --check --quiet --strict -; then
+            echo "::error::The actionlint ${ACTIONLINT_VERSION} download does not match the expected SHA-256 ${ACTIONLINT_SHA256}"
+            exit 1
+          fi
+          tar -xzf "${actionlint_dir}/${tarball}" -C "${actionlint_dir}" actionlint
+          sudo install -m 0755 "${actionlint_dir}/actionlint" /usr/local/bin/actionlint
+          rm -rf "${actionlint_dir}"
+      - name: Lint
+        run: |
+          actionlint --version
+          shellcheck --version
+          yq --version
+          .github/scripts/lint.sh
   sentinel:
     name: "👁️ Sentinel"
     if: always()
-    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, ubuntu-slim, unsupported-os]
+    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, ubuntu-slim, unsupported-os, lint]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
