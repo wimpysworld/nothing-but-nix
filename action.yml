@@ -293,17 +293,37 @@ runs:
             sort -u
         }
 
+        # Run apt-get without prompts. Wait for the dpkg lock if another apt
+        # process holds it.
+        function apt_get() {
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get -y -q \
+            -o Dpkg::Use-Pty=0 \
+            -o DPkg::Lock::Timeout=120 \
+            "$@"
+        }
+
         # Remove and purge the installed packages that match the given
-        # expressions. apt-get fails on a name that matches no package, and
+        # expressions, and the packages that nothing needs any more, in one
+        # apt-get call. apt-get fails on a name that matches no package, and
         # set -e then stops the purge, so pass only installed packages.
         function remove_packages() {
           local packages=()
           mapfile -t packages < <(installed_packages "$@")
           if [[ "${#packages[@]}" -eq 0 ]]; then
             echo "No installed package matches: $*"
+            apt_get autoremove --purge
             return 0
           fi
-          sudo apt-get -y remove --purge "${packages[@]}"
+          echo "Removing ${#packages[@]} packages"
+          apt_get remove --purge --autoremove "${packages[@]}"
+        }
+
+        # Restore update-initramfs.conf when the purge exits.
+        initramfs_conf=/etc/initramfs-tools/update-initramfs.conf
+        function restore_initramfs_conf() {
+          if [[ -f "${initramfs_conf}.nothing-but-nix" ]]; then
+            sudo mv "${initramfs_conf}.nothing-but-nix" "${initramfs_conf}"
+          fi
         }
 
         # Run one rmz per path in parallel and wait for all of them.
@@ -443,21 +463,6 @@ runs:
             sudo systemctl stop "${docker_units[@]}"
           fi
           rmz_parallel /var/lib/docker /var/lib/containerd
-          remove_packages 'docker.*'
-          sudo rmz -f /usr/bin/docker*
-          echo "Cleanse docker complete" > "${expansion_dir}/docker_done"
-        fi
-
-        # Cleanse snap
-        if [[ "${protocol_level}" -ge 2 ]]; then
-          remove_packages snapd
-          sudo rmz -f \
-            /snap \
-            /usr/lib/snapd \
-            /var/snap \
-            /var/lib/snapd \
-            "${HOME}/snap"
-          echo "Cleanse snap complete" > "${expansion_dir}/snap_done"
         fi
 
         # Cleanse apt
@@ -470,62 +475,86 @@ runs:
         path-exclude /usr/share/man/*
         APTCFG
 
-          if [[ "${protocol_level}" -ge 3 ]]; then
-            remove_packages \
-              'apache2.*' \
-              'aspnetcore-.*' \
-              'azure-cli' \
-              'buildah' \
-              'byobu.*' \
-              'clang-.*' \
-              'containerd\.io' \
-              'containernetworking-plugins' \
-              'dotnet-.*' \
-              'firefox' \
-              'fonts-.*' \
-              'fwupd' \
-              'gfortran-.*' \
-              'google-.*' \
-              'gradle.*' \
-              'java.*' \
-              'kotlin.*' \
-              'kubectl' \
-              'libclang-.*' \
-              'libgl1-mesa-dri' \
-              'libgirepository-.*' \
-              'libgtk-.*' \
-              'libllvm-.*' \
-              'libx265-.*' \
-              'llvm-.*' \
-              'man-db' \
-              'mecab.*' \
-              'mediainfo' \
-              'mercurial.*' \
-              'microsoft-edge-stable' \
-              'mongodb-.*' \
-              'mono-.*' \
-              'mssql-.*' \
-              'mysql-.*' \
-              'nginx-.*' \
-              'php.*' \
-              'podman.*' \
-              'powershell.*' \
-              'postgres.*' \
-              'python-babel-localedata' \
-              'python3-babel.*' \
-              'python3-boto.*' \
-              'ruby.*' \
-              'r-base.*' \
-              'skopeo' \
-              'tcl' \
-              'tk' \
-              'tex-.*' \
-              'vim.*'
+          # Skip initramfs rebuilds while packages go. The runner does not boot
+          # again, and update-initramfs.conf(5) documents update_initramfs=no
+          # for this. Images that use dracut do not have this file.
+          if [[ -f "${initramfs_conf}" ]]; then
+            sudo cp -p "${initramfs_conf}" "${initramfs_conf}.nothing-but-nix"
+            trap restore_initramfs_conf EXIT
+            sudo sed -i 's/^update_initramfs=.*/update_initramfs=no/' "${initramfs_conf}"
           fi
 
-          sudo apt-get -y autoremove --purge
-          sudo apt-get -y clean
+          # Remove the Docker and snapd packages, and the Rampage list, in one
+          # apt-get call, so that dpkg runs its triggers once.
+          packages=('docker.*' 'snapd')
+          if [[ "${protocol_level}" -ge 3 ]]; then
+            packages+=(
+              'apache2.*'
+              'aspnetcore-.*'
+              'azure-cli'
+              'buildah'
+              'byobu.*'
+              'clang-.*'
+              'containerd\.io'
+              'containernetworking-plugins'
+              'dotnet-.*'
+              'firefox'
+              'fonts-.*'
+              'fwupd'
+              'gfortran-.*'
+              'google-.*'
+              'gradle.*'
+              'java.*'
+              'kotlin.*'
+              'kubectl'
+              'libclang-.*'
+              'libgl1-mesa-dri'
+              'libgirepository-.*'
+              'libgtk-.*'
+              'libllvm-.*'
+              'libx265-.*'
+              'llvm-.*'
+              'man-db'
+              'mecab.*'
+              'mediainfo'
+              'mercurial.*'
+              'microsoft-edge-stable'
+              'mongodb-.*'
+              'mono-.*'
+              'mssql-.*'
+              'mysql-.*'
+              'nginx-.*'
+              'php.*'
+              'podman.*'
+              'powershell.*'
+              'postgres.*'
+              'python-babel-localedata'
+              'python3-babel.*'
+              'python3-boto.*'
+              'ruby.*'
+              'r-base.*'
+              'skopeo'
+              'tcl'
+              'tk'
+              'tex-.*'
+              'vim.*'
+            )
+          fi
+          remove_packages "${packages[@]}"
+          apt_get clean
+          restore_initramfs_conf
           echo "Cleanse apt complete" > "${expansion_dir}/apt_done"
+
+          # Delete what the docker and snapd packages leave behind
+          sudo rmz -f /usr/bin/docker*
+          echo "Cleanse docker complete" > "${expansion_dir}/docker_done"
+          sudo rmz -f \
+            /snap \
+            /usr/lib/snapd \
+            /var/snap \
+            /var/lib/snapd \
+            "${HOME}/snap"
+          echo "Cleanse snap complete" > "${expansion_dir}/snap_done"
         fi
 
         # Cleave
