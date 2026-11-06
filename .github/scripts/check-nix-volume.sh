@@ -5,8 +5,10 @@
 #
 # Without min-avail-gib, the floor comes from the protocol and the
 # architecture. Each floor is about 10% under the lowest available space
-# observed on public runners in November 2026. Review the floors when a
-# runner image changes.
+# observed on public runners in November 2026 with a 2 GiB root safe haven,
+# less the extra space that root-safe-haven: auto reserves on / (8 GiB for
+# holster and carve, 4 GiB for cleave and rampage). Review the floors when
+# a runner image changes.
 set -euo pipefail
 
 nix_volume="${NIX_VOLUME:-/nix}"
@@ -21,17 +23,17 @@ arch="$(uname -m)"
 floor_gib=""
 if [[ "${arch}" == "aarch64" || "${arch}" == "arm64" ]]; then
   case "${protocol}" in
-    holster) floor_gib=94 ;;
-    carve) floor_gib=106 ;;
-    cleave) floor_gib=113 ;;
-    rampage) floor_gib=119 ;;
+    holster) floor_gib=86 ;;
+    carve) floor_gib=98 ;;
+    cleave) floor_gib=109 ;;
+    rampage) floor_gib=115 ;;
   esac
 else
   case "${protocol}" in
-    holster) floor_gib=75 ;;
-    carve) floor_gib=97 ;;
-    cleave) floor_gib=106 ;;
-    rampage) floor_gib=114 ;;
+    holster) floor_gib=67 ;;
+    carve) floor_gib=89 ;;
+    cleave) floor_gib=102 ;;
+    rampage) floor_gib=110 ;;
   esac
 fi
 if [[ -z "${floor_gib}" ]]; then

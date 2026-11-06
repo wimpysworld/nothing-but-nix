@@ -164,16 +164,19 @@ Control how much space to spare from the Nix store land grab with custom safe ha
 - uses: wimpysworld/nothing-but-nix@main
   with:
     ️hatchet-protocol: 'cleave'
-    root-safe-haven: '3072'   # Reserve 3GiB on the / filesystem
+    root-safe-haven: '16384'  # Reserve 16GiB on the / filesystem (default: auto)
     mnt-safe-haven: '2048'    # Reserve 2GiB on the /mnt filesystem
 ```
 
 These safe havens define how much space (in MB) will be mercifully spared during space reclamation:
-- Default `root-safe-haven` is 2048MB (2GiB)
+- Default `root-safe-haven` is `auto`: 10240MB (10GiB) for Holster and Carve, and 6144MB (6GiB) for Cleave and Rampage
 - Default `mnt-safe-haven` is 1024MB (1GiB)
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved
+- `root-safe-haven` accepts `auto` or a positive whole number of MB. Any other value fails the step
 
-Increase these values if you need more breathing room on your filesystems, or decrease them to show no mercy! 😈
+After every protocol, `/` keeps only the safe haven. The workspace, the `setup-*` toolchains, caches, `/tmp`, and the runner logs still write to `/`. Holster and Carve also keep Docker, and Docker writes its images and containers to `/`, so `auto` reserves more for them. The extra reserve costs `/nix` about 8GiB with Holster and Carve, and about 4GiB with Cleave and Rampage, compared with a 2GiB reserve.
+
+Raise `root-safe-haven` when the job writes a lot to `/`, for example a large Docker build, a big checkout, or large caches. Lower it to give `/nix` more space when the job writes almost nothing outside `/nix`. Show no mercy! 😈 The post step writes the free space of `/` at the end of the job to the job summary, and warns when it is below 1GiB.
 
 ### Choose the Compression 🗜️
 

@@ -63,7 +63,7 @@ The action follows a specific execution order:
 - `nix-size-bytes` and `nix-avail-bytes`: size and available bytes of `/nix` when the action finishes. In background mode the purge can grow `/nix` after that.
 - `purge-seconds`: duration of the purge. It is empty in background mode, because the purge is still running when the action finishes.
 
-The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`. When the purge started but did not succeed, the post step writes a `::warning::` and prints the last 50 lines of `expansion.log`.
+The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, the free space of `/` at the end of the job, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`, and prints the same values to the log. When `/` has less than 1 GiB free, the post step writes a `::warning::`. When the purge started but did not succeed, the post step writes a `::warning::` and prints the last 50 lines of `expansion.log`.
 
 The purge runs one `apt-get remove --purge --autoremove` for the Docker and snapd packages and, for rampage, the Rampage list, then `apt-get clean`. `apt_get` runs it with `DEBIAN_FRONTEND=noninteractive` and a dpkg lock timeout. The call selects the classic solver with `-o APT::Solver=internal`. On Ubuntu 26.04, the apt 3 solver does not remove the packages that depend on the removed ones, and it fails. While the call runs, the purge sets `update_initramfs=no` in `/etc/initramfs-tools/update-initramfs.conf`, so that dpkg triggers do not rebuild the initramfs, and restores the file afterwards, also on failure. Images that use dracut do not have this file, and the purge leaves them alone. The purge passes only installed packages to `apt-get`. `installed_packages` matches each extended regular expression against the whole package name, so a pattern that matches no installed package cannot stop the script under `set -e`.
 
@@ -114,12 +114,12 @@ After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`
 
 | Protocol | x64 floor | arm64 floor |
 | --- | --- | --- |
-| holster | 75 GiB | 94 GiB |
-| carve | 97 GiB | 106 GiB |
-| cleave | 106 GiB | 113 GiB |
-| rampage | 114 GiB | 119 GiB |
+| holster | 67 GiB | 86 GiB |
+| carve | 89 GiB | 98 GiB |
+| cleave | 102 GiB | 109 GiB |
+| rampage | 110 GiB | 115 GiB |
 
-Each floor is about 10% under the lowest available space observed on public runners in November 2026. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
+Each floor is about 10% under the lowest available space observed on public runners in November 2026 (CI run 42225007501, with a 2 GiB root safe haven), less the extra space that `root-safe-haven: auto` reserves: 8 GiB for holster and carve, and 4 GiB for cleave and rampage. The floors come from that calculation, not from a run with `auto`, so check them against the first CI run with `auto` and correct them. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
 
 The `ubuntu-slim` job runs the action on `ubuntu-slim`, an unprivileged container runner with no loop devices and no mount support. It checks that the action skips, that the outputs are empty, and that `/nix` is not a Btrfs mount. The `👁️ Sentinel` job needs this job too.
 
@@ -176,9 +176,13 @@ fi
 ### Safe Haven Adjustments
 
 Safe havens prevent filesystem exhaustion:
-- `root-safe-haven`: Space reserved on `/` (default: 2048MB)
+- `root-safe-haven`: Space reserved on `/` (default: `auto`). `auto` reserves 10240MB for holster and carve, and 6144MB for cleave and rampage. A positive whole number of MB overrides it. Any other value fails The Hatchet Protocol with `::error::`
 - `mnt-safe-haven`: Space reserved on `/mnt` (default: 1024MB)
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved during initial volume creation and expansion
+
+The Hatchet Protocol resolves `root-safe-haven` and writes the result to its `root-safe-haven` output. The Volume and every `add_expansion_disk` call use that output, never the raw input.
+
+After every protocol, `/` keeps only the safe haven. The workspace, the `setup-*` toolchains, caches, `/tmp`, and the runner logs still write to `/`. Holster and carve keep Docker, which also writes to `/`, so `auto` reserves more for them. Compared with the old 2048MB default, `auto` costs `/nix` about 8 GiB for holster and carve and about 4 GiB for cleave and rampage. Users must raise the reserve for jobs that write a lot to `/`, for example large Docker builds.
 
 An expansion disk is only created if `free_space > (root_safe_haven + 2048)`. The purge can call `add_expansion_disk` more than once, and each call that finds enough space adds one disk image.
 
