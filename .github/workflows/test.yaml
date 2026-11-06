@@ -19,6 +19,11 @@ jobs:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04, ubuntu-24.04-arm, ubuntu-26.04-arm]
         hatchet-protocol: [holster, carve, cleave, rampage]
+        # Mount with a negative zstd level, which needs kernel 6.15 or later
+        include:
+          - os: ubuntu-26.04
+            hatchet-protocol: holster
+            btrfs-compression: 'zstd:-1'
       fail-fast: false
     permissions:
       contents: read
@@ -33,12 +38,24 @@ jobs:
         with:
           hatchet-protocol: ${{ matrix.hatchet-protocol }}
           witness-carnage: true
+          btrfs-compression: ${{ matrix.btrfs-compression || 'zstd:1' }}
       - name: Check TMPDIR
         run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
       - name: Check /nix volume
         env:
           HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
         run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
+      - name: Check Btrfs compression
+        if: matrix.btrfs-compression
+        env:
+          BTRFS_COMPRESSION: ${{ matrix.btrfs-compression }}
+        run: |
+          mount_opts="$(findmnt --noheadings --output OPTIONS --mountpoint /nix)"
+          echo "Mount options of /nix: ${mount_opts}"
+          if ! tr ',' '\n' <<< "${mount_opts}" | grep -qxF "compress=${BTRFS_COMPRESSION}"; then
+            echo "::error::/nix is not mounted with compress=${BTRFS_COMPRESSION}"
+            exit 1
+          fi
       - uses: DeterminateSystems/determinate-nix-action@main
       - name: Nix
         run: |

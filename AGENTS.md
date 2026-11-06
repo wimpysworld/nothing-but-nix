@@ -14,7 +14,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 - **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS and Windows runners gracefully skip)
 - **Shell**: Bash (embedded in `action.yml`)
-- **Filesystem**: BTRFS with single profile (`-d single -m single`), zstd compression, loop devices
+- **Filesystem**: BTRFS with single profile (`-d single -m single`), `zstd:1` compression by default, loop devices
 - **Tools**: `rmz` (Fast Unix Commands), `systemctl`, APT, snap
 - **Dependencies**: Standard Ubuntu utilities (`df`, `losetup`, `fallocate`, `mkfs.btrfs`)
 
@@ -67,6 +67,10 @@ The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all
 
 The purge runs one `apt-get remove --purge --autoremove` for the Docker and snapd packages and, for rampage, the Rampage list, then `apt-get clean`. `apt_get` runs it with `DEBIAN_FRONTEND=noninteractive` and a dpkg lock timeout. While the call runs, the purge sets `update_initramfs=no` in `/etc/initramfs-tools/update-initramfs.conf`, so that dpkg triggers do not rebuild the initramfs, and restores the file afterwards, also on failure. Images that use dracut do not have this file, and the purge leaves them alone. The purge passes only installed packages to `apt-get`. `installed_packages` matches each extended regular expression against the whole package name, so a pattern that matches no installed package cannot stop the script under `set -e`.
 
+### Btrfs Compression
+
+The `btrfs-compression` input sets the `compress` mount option of the pool. The default is `zstd:1`. The Volume checks the value against a strict regular expression before it creates anything, and fails with `::error::` on any value outside `none`, `lzo`, `zlib`, `zlib:1` to `zlib:9`, `zstd`, `zstd:1` to `zstd:15`, and `zstd:-1` to `zstd:-15`. `none` removes the `compress` option. Never emit `compress-force`. Kernels older than 6.15 map a negative `zstd` level to level 3 without a warning, so on those kernels The Volume uses `zstd:1` and prints a `::warning::`. Keep the other mount options, `noatime,nobarrier,nodiscard,space_cache=v2,commit=120`, unchanged.
+
 ### Naming Conventions
 
 - **Protocol levels**: 0 (holster), 1 (carve), 2 (cleave), 3 (rampage)
@@ -100,6 +104,7 @@ The `test.yaml` workflow validates:
 - All four hatchet protocols (holster, carve, cleave, rampage)
 - Ubuntu 22.04, 24.04 and 26.04 on x64 with all three installers
 - Ubuntu 24.04 and 26.04 on arm64 with `DeterminateSystems/determinate-nix-action` only, to keep the matrix small
+- `btrfs-compression: zstd:-1` in the `determinate-nix-action` job for holster on `ubuntu-26.04`. One `include` entry adds the value to that existing job, and a step checks that `/nix` has the `compress=zstd:-1` mount option.
 - Three popular Nix installers:
   - DeterminateSystems/determinate-nix-action
   - nixbuild/nix-quick-install-action (requires `nix-permission-edict: true`)
