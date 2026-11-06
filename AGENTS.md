@@ -51,7 +51,7 @@ The action follows a specific execution order:
 1. **The Checks**: Validate environment (Ubuntu on Linux, macOS/Windows graceful skip, GitHub Actions, no pre-existing `/nix`)
 2. **The Hatchet Protocol**: Set purge level (0-3)
 3. **The Survey**: Record free bytes on `/` before any purge
-4. **The Setup**: Download and install `rmz` binary (protocol level ≥2)
+4. **The Setup**: Download, check, and install the `rmz` binary (protocol level ≥1)
 5. **The Volume**: Create initial BTRFS volume from `/mnt` free space
 6. **The Local**: Purge `/usr/local` early (protocol level ≥2)
 7. **The Purge**: Execute background expansion script and time it
@@ -70,6 +70,10 @@ The purge runs one `apt-get remove --purge --autoremove` for the Docker and snap
 ### Naming Conventions
 
 - **Protocol levels**: 0 (holster), 1 (carve), 2 (cleave), 3 (rampage)
+  - holster: no purge, `/nix` uses the free space of `/mnt` only
+  - carve: the fast purge. It deletes the large trees in `fast_trees` that dpkg does not own (Rust, GHC, the tool cache, the Android SDK, .NET, and Swift), then grows `/nix`. No apt, Docker, or snap work.
+  - cleave: carve plus `/usr/local`, Docker, snapd, `apt-get autoremove`, and the Cleave `rmz` list
+  - rampage: cleave plus the Rampage apt list and the Rampage `rmz` list
 - **Marker files**: Expansion progress tracked via `${HOME}/.expansion/*_done`
 - **Disk images**: `/mnt/disk${loop_num}.img` (initial) and `/disk${loop_num}.img` (expansion)
 
@@ -101,7 +105,7 @@ The `test.yaml` workflow validates:
   - nixbuild/nix-quick-install-action (requires `nix-permission-edict: true`)
   - cachix/install-nix-action (requires `nix-permission-edict: true`)
 
-After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`. The script checks that `/nix` is a Btrfs mount, that it is writable, and that its available space is at or above the floor for the protocol: 75 GiB for holster and carve, 104 GiB for cleave, and 114 GiB for rampage. The floors are about 10% under the space observed on public x64 runners. On arm64 runners the space is not yet known, so the script applies the holster floor for every protocol. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
+After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`. The script checks that `/nix` is a Btrfs mount, that it is writable, and that its available space is at or above the floor for the protocol: 75 GiB for holster and carve, 104 GiB for cleave, and 114 GiB for rampage. The floors are about 10% under the space observed on public x64 runners. On arm64 runners the space is not yet known, so the script applies the holster floor for every protocol. When a runner image changes and a weekly run fails on a floor, review the floors in the script. The carve floor stays at 75 GiB after carve became the fast purge, because no runner has measured the new carve yet. Raise it after the first green run.
 
 The `background-purge` job runs the action with `witness-carnage: false` for cleave and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check. The `👁️ Sentinel` job needs this job too.
 
@@ -136,13 +140,13 @@ When editing `action.yml`:
 2. **Preserve POSIX compliance** in embedded Bash scripts
 3. **Update marker files** if adding new purge stages
 4. **Document new inputs** in README.md with protocol comparison table
-5. **Use `rmz` not `rm`** for large directory deletions (protocol level ≥2)
+5. **Use `rmz` not `rm`** for large directory deletions (protocol level ≥1)
 
 ### Adding New Purge Targets
 
 Add a large tree that no dpkg package owns, for example a toolchain from an install script or a tarball, to `fast_trees`. At run time `unowned_paths` drops any path that dpkg owns, so the purge does not delete dpkg files behind dpkg's back. Do not add a `path-exclude` to `01_nocruft` for a toolchain path. That file is only for documentation paths, and an exclude on a toolchain path makes a later `apt-get install` of that toolchain incomplete.
 
-Cleave deletes `/usr/local/lib/android` and `/usr/local/.ghcup` with `/usr/local.purge`, and `fast_trees` adds `/opt/ghc`, `/usr/share/dotnet`, and `/usr/share/swift`.
+Carve deletes `/usr/local/lib/android` and `/usr/local/.ghcup` directly. Cleave deletes them with `/usr/local.purge`, because The Local moves `/usr/local` first. Both delete `/opt/ghc`, `/usr/share/dotnet`, and `/usr/share/swift` through `fast_trees`.
 
 For other targets, follow this pattern in the expansion script:
 
@@ -180,7 +184,7 @@ The `/nix` volume grows in up to three phases:
 2. **First expansion disk**: Added from `/` after the purge deletes the large trees that dpkg does not own
 3. **Second expansion disk**: Added from `/` after the Docker, apt, and remaining `rmz` work
 
-For cleave and rampage, the purge runs in this order:
+For carve, cleave, and rampage, the purge runs in this order. Carve stops after step 2.
 
 1. `fast_trees` lists the large trees for the protocol, and `unowned_paths` keeps only the paths that no dpkg package owns (`dpkg-query --search`). `rmz_parallel` deletes them, one `rmz` per path in parallel.
 2. `add_expansion_disk` grows `/nix`.

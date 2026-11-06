@@ -126,16 +126,16 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 
 #### Protocol Comparison ⚖️
 
-| Protocol | `/nix` | Description                                      | Purge apt  | Purge docker | Purge snap | Purged file systems     |
-|----------|--------|--------------------------------------------------|------------|--------------|------------|-------------------------|
-| Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt` | No         | No           | No         | None                    |
-| Carve    | ~85GB  | Craft and combine free space from `/` and `/mnt` | No         | No           | No         | None                    |
-| Cleave   | ~115GB | Make powerful, decisive cuts to large packages   | Minimal    | Yes          | Yes        | `/opt` and `/usr/local` |
-| Rampage  | ~130GB | Relentless, brutal elimination of all bloat      | Aggressive | Yes          | Yes        | Muahahaha! 🔥🌎         |
+| Protocol | `/nix` | Description                                          | Purge apt  | Purge docker | Purge snap | Purged file systems                                   |
+|----------|--------|------------------------------------------------------|------------|--------------|------------|-------------------------------------------------------|
+| Holster  | ~65GB  | Keep the hatchet sheathed, use space from `/mnt`     | No         | No           | No         | None                                                  |
+| Carve    | ~85GB  | Fast cuts to large toolchains that dpkg does not own | No         | No           | No         | Toolchains in `/opt`, `/usr/local`, `/usr/share`, `~` |
+| Cleave   | ~115GB | Make powerful, decisive cuts to large packages       | Minimal    | Yes          | Yes        | `/opt`, `/usr/local`, toolchains in `/usr/share`      |
+| Rampage  | ~130GB | Relentless, brutal elimination of all bloat          | Aggressive | Yes          | Yes        | Muahahaha! 🔥🌎                                        |
 
 Choose wisely:
 - **Holster** when you need the runner's tools to remain fully functional
-- **Carve** to preserve functional runner tooling but claim all free space for Nix
+- **Carve** for a fast purge that deletes only the large toolchains that dpkg does not own (Android SDK, .NET, GHC, Swift, Rust, and the tool cache) and leaves apt, Docker, and snap alone
 - **Cleave** (*default*) for a good balance of space and functionality
 - **Rampage** when you need maximum Nix space and don't care what breaks `#nix-is-life`
 

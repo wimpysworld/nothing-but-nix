@@ -5,7 +5,7 @@ branding:
   color: 'red'
 inputs:
   hatchet-protocol:
-    description: 'Level of file purging (Holster: none, Cleave: standard, Rampage: aggressive)'
+    description: 'Level of file purging (Holster: none, Carve: fast, Cleave: standard, Rampage: aggressive)'
     required: false
     default: 'cleave'
   witness-carnage:
@@ -103,7 +103,7 @@ runs:
             protocol_name="holster"
             protocol_level=0;;
           "carve")
-            echo "🪓 Hatchet Protocol: Carve - Craft and combine free space from / and /mnt (Level 1)"
+            echo "🪓 Hatchet Protocol: Carve - Cut the large toolchains that dpkg does not own, fast (Level 1)"
             protocol_name="carve"
             protocol_level=1;;
           "cleave")
@@ -131,7 +131,7 @@ runs:
         echo "Free space of / before the purge: ${root_free_bytes} bytes"
         echo "root-free-bytes=${root_free_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Setup
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 1
+      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 1
       shell: bash
       run: |
         # rmz from Fast Unix Commands, pinned to one release. Check the
@@ -369,24 +369,33 @@ runs:
 
         # Print the large trees for this protocol that dpkg does not own. The
         # purge deletes these first, so that /nix grows before the slower
-        # Docker and apt work. A path that dpkg owns waits for the later
-        # phases, which delete it only when the Cleave or Rampage rmz list
-        # names it. /opt/ghc and /usr/share/dotnet are in this list only, so
-        # the purge never deletes them behind dpkg's back.
+        # Docker and apt work. Carve deletes only these trees. A path that
+        # dpkg owns waits for the later phases, which delete it only when the
+        # Cleave or Rampage rmz list names it. /opt/ghc, /usr/share/dotnet,
+        # and the /usr/local trees for carve are in this list only, so the
+        # purge never deletes them behind dpkg's back.
         function fast_trees() {
           local trees=()
           shopt -s nullglob
-          if [[ "${protocol_level}" -ge 2 ]]; then
+          if [[ "${protocol_level}" -ge 1 ]]; then
+            # Cleave moves /usr/local to /usr/local.purge first, so the two
+            # /usr/local paths exist only for carve.
             trees+=(
               "${HOME}/.rustup"
               "${HOME}/.cargo"
-              "${HOME}/.dotnet"
               /opt/ghc
               /opt/hostedtoolcache
-              /opt/pipx*
-              /usr/local.purge
+              /usr/local/.ghcup
+              /usr/local/lib/android
               /usr/share/dotnet
               /usr/share/swift
+            )
+          fi
+          if [[ "${protocol_level}" -ge 2 ]]; then
+            trees+=(
+              "${HOME}/.dotnet"
+              /opt/pipx*
+              /usr/local.purge
             )
           fi
           if [[ "${protocol_level}" -ge 3 ]]; then
@@ -436,14 +445,9 @@ runs:
           fi
         }
 
-        # If carve is selected, claim space from / now
-        if [[ "${protocol_level}" -eq 1 ]]; then
-          echo "Disk space has been carved out" > "${expansion_dir}/carve_done"
-          add_expansion_disk
-        fi
-
-        # Delete the trees that dpkg does not own, then grow /nix at once
-        if [[ "${protocol_level}" -ge 2 ]]; then
+        # Delete the trees that dpkg does not own, then grow /nix at once.
+        # Carve stops after this phase, with no Docker or apt work.
+        if [[ "${protocol_level}" -ge 1 ]]; then
           mapfile -t trees < <(fast_trees)
           if [[ "${#trees[@]}" -gt 0 ]]; then
             echo "Deleting trees that dpkg does not own: ${trees[*]}"
@@ -451,6 +455,9 @@ runs:
           fi
           echo "Fast purge complete" > "${expansion_dir}/fast_done"
           add_expansion_disk
+        fi
+        if [[ "${protocol_level}" -eq 1 ]]; then
+          echo "Disk space has been carved out" > "${expansion_dir}/carve_done"
         fi
 
         # Cleanse docker. Stop the daemons, then delete their data in one
