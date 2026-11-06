@@ -158,7 +158,7 @@ The `unsupported-os` job runs the action on `macos-15-intel` and `windows-latest
 
 macOS runners are few, so the macOS matrix is small:
 
-- `macos`: `DeterminateSystems/determinate-nix-action` on `macos-15` and `macos-26` for every protocol, and `cachix/install-nix-action` and `nixbuild/nix-quick-install-action` on `macos-26` for holster and rampage, all with `witness-carnage: true`
+- `macos`: `DeterminateSystems/determinate-nix-action` on `macos-15` and `macos-26` for every protocol, and `cachix/install-nix-action` on `macos-26` for holster and rampage, and `nixbuild/nix-quick-install-action` on `macos-26` for holster and cleave, all with `witness-carnage: true`. `nix-quick-install-action` does not get rampage, because rampage removes Homebrew and the installer needs `gtar` from Homebrew
 - `macos-background-purge`: rampage on `macos-26` with `witness-carnage: false`. It builds `hello` while the purge runs, then waits at most 10 minutes for `all_done`
 - `macos-preview`: rampage with `DeterminateSystems/determinate-nix-action` on `xcode-27`, the macOS 27 preview image. It has `continue-on-error: true` and is not in the needs of `👁️ Sentinel`, because it is a preview
 

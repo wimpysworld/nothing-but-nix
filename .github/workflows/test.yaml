@@ -278,8 +278,10 @@ jobs:
           - os: macos-26
             hatchet-protocol: holster
             installer: nix-quick-install
+          # Not rampage: it removes Homebrew, and with it the gtar that
+          # nix-quick-install-action needs.
           - os: macos-26
-            hatchet-protocol: rampage
+            hatchet-protocol: cleave
             installer: nix-quick-install
       fail-fast: false
     permissions:
