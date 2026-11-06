@@ -134,30 +134,31 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 1
       shell: bash
       run: |
+        # rmz from Fast Unix Commands, pinned to one release. Check the
+        # download against the SHA-256 of the release asset before use.
+        RMZ_VERSION="3.0.1"
         ARCH=$(uname -m)
         if [[ "$ARCH" == "x86_64" ]]; then
           URL_ARCH="x86_64"
+          RMZ_SHA256="54f643c6ba170d613c65c48697000faf68d9c77611c10458ea5b1eac99799d25"
         elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
           URL_ARCH="aarch64"
+          RMZ_SHA256="af6e636d4d25f3cbf14b0e50dc1f13ee032dc4ff6109604aefcb2151edc4ba39"
         else
-          echo "Unsupported architecture: $ARCH"
+          echo "::error::Unsupported architecture for rmz: $ARCH"
           exit 1
         fi
 
-        OS=$(uname -s)
-        if [[ "$OS" == "Linux" ]]; then
-          URL_OS="unknown-linux-gnu"
-        elif [[ "$OS" == "Darwin" ]]; then
-          URL_OS="apple-darwin"
-        else
-          echo "Unsupported OS: $OS"
+        DOWNLOAD_URL="https://github.com/SUPERCILEX/fuc/releases/download/${RMZ_VERSION}/${URL_ARCH}-unknown-linux-gnu-rmz"
+        rmz_dir="$(mktemp --directory)"
+        curl --fail --silent --show-error --location --retry 3 -o "${rmz_dir}/rmz" "$DOWNLOAD_URL"
+        if ! echo "${RMZ_SHA256}  ${rmz_dir}/rmz" | sha256sum --check --quiet --strict -; then
+          echo "::error::The rmz ${RMZ_VERSION} download for ${URL_ARCH} does not match the expected SHA-256 ${RMZ_SHA256}"
+          rm -rf "${rmz_dir}"
           exit 1
         fi
-
-        DOWNLOAD_URL="https://github.com/SUPERCILEX/fuc/releases/download/3.0.1/${URL_ARCH}-${URL_OS}-rmz"
-        curl -L -o rmz "$DOWNLOAD_URL"
-        chmod +x rmz
-        sudo mv rmz /usr/bin/rmz
+        sudo install -m 0755 "${rmz_dir}/rmz" /usr/bin/rmz
+        rm -rf "${rmz_dir}"
         rmz --version
     - name: The Volume
       if: steps.environment-check.outputs.is_supported == 'true'
