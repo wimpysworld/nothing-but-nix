@@ -180,7 +180,7 @@ echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
 
 Temporary files use the compressed BTRFS pool rather than the constrained `/` filesystem or the unallocated `/mnt` safe haven.
 
-`TMPDIR` must stay outside `/nix`. The Nix multi-user installer runs `chown -R root:nixbld /nix`. When `TMPDIR` is under `/nix`, that command locks the installer out of its own temporary files and the install fails (#24, #57). Do not move `TMPDIR` into `/nix`. The action fails fast when `TMPDIR` resolves under `/nix`, and each Linux job in `test.yaml` checks `TMPDIR` again before it installs Nix. The `gate` job in `test.yaml` sums up the test matrix and fails unless every test job succeeds.
+`TMPDIR` must stay outside `/nix`. The Nix multi-user installer runs `chown -R root:nixbld /nix`. When `TMPDIR` is under `/nix`, that command locks the installer out of its own temporary files and the install fails (#24, #57). Do not move `TMPDIR` into `/nix`. The action fails fast when `TMPDIR` resolves under `/nix`, and each Linux job in `test.yaml` checks `TMPDIR` again before it installs Nix. The `👁️ Sentinel` job (job id `sentinel`) in `test.yaml` sums up the test matrix and fails unless every test job succeeds. The ruleset on `main` requires `👁️ Sentinel`, so a rename of that job must change `.tailor.yml` in the same pull request.
 
 ## Contributing
 
