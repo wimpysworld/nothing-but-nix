@@ -105,8 +105,8 @@ jobs:
           echo "Hello Nix" | nix run "nixpkgs#neo-cowsay"
           # Build a package to ensure the Nix store is functional
           nix build "nixpkgs#hello"
-  gate:
-    name: gate
+  sentinel:
+    name: "👁️ Sentinel"
     if: always()
     needs: [determinate-nix-action, nix-quick-install, cachix-nix-action]
     runs-on: ubuntu-latest

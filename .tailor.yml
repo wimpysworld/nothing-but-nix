@@ -112,7 +112,7 @@ ruleset:
         # Actions job that is the job's name. integration_id is optional and
         # restricts the check to one app; 15368 is GitHub Actions.
         required_status_checks:
-          - context: gate
+          - context: "👁️ Sentinel"
             integration_id: 15368
     code_scanning:
       enabled: false
