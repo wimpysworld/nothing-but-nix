@@ -306,49 +306,141 @@ runs:
           sudo apt-get -y remove --purge "${packages[@]}"
         }
 
-        function add_expansion_disk() {
-          # Check for additional free space after purging
-          free_space=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
-          echo "Free space of / after purge: ${free_space}MB"
+        # Run one rmz per path in parallel and wait for all of them.
+        function rmz_parallel() {
+          local path pid pids=() status=0
+          for path in "$@"; do
+            sudo rmz -f "${path}" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do
+            wait "${pid}" || status=1
+          done
+          return "${status}"
+        }
 
-          # Create additional disk if suitable free space exists
-          if [ $free_space -gt $((root_safe_haven + 2048)) ]; then
-            # Calculate the size of the expansion disk, reserving the safe haven
-            disk_size=$((free_space - root_safe_haven))
-            echo "Creating expansion disk of ${disk_size}MB in /"
-            # Create expansion disk image
-            loop_dev=$(sudo losetup --find)
-            loop_num=${loop_dev##*/loop}
-            if sudo fallocate -l ${disk_size}M "/disk${loop_num}.img"; then
-              sudo losetup ${loop_dev} "/disk${loop_num}.img"
-
-              # Add the new device to the pool
-              sudo btrfs device add --nodiscard ${loop_dev} /nix
-              echo "Added expansion disk "/disk${loop_num}.img" (${loop_dev}, ${disk_size}MB) to /nix pool" > $expansion_dir/expansion_done
-              sudo btrfs filesystem show
+        # Print the given paths that exist and that no dpkg package owns.
+        function unowned_paths() {
+          local existing=() owned="" path search_status=0
+          for path in "$@"; do
+            if [[ -e "${path}" ]]; then
+              existing+=("${path}")
             fi
+          done
+          if [[ "${#existing[@]}" -eq 0 ]]; then
+            return 0
+          fi
+          # dpkg-query exits 1 when a path has no owner, which is expected
+          # here, and 2 on a fatal error. Each output line is
+          # "package[, package]: path".
+          owned="$(dpkg-query --search "${existing[@]}" 2>/dev/null)" || search_status=$?
+          if [[ "${search_status}" -gt 1 ]]; then
+            echo "dpkg-query failed with status ${search_status}, so no path counts as unowned" >&2
+            return 0
+          fi
+          owned="$(sed -n 's/^[^:]*: //p' <<< "${owned}")"
+          for path in "${existing[@]}"; do
+            if ! grep -qxF -- "${path}" <<< "${owned}"; then
+              echo "${path}"
+            fi
+          done
+        }
+
+        # Print the large trees for this protocol that dpkg does not own. The
+        # purge deletes these first, so that /nix grows before the slower
+        # Docker and apt work. A path that dpkg owns waits for the later
+        # phases, which delete it as before.
+        function fast_trees() {
+          local trees=()
+          shopt -s nullglob
+          if [[ "${protocol_level}" -ge 2 ]]; then
+            trees+=(
+              "${HOME}/.rustup"
+              "${HOME}/.cargo"
+              "${HOME}/.dotnet"
+              /opt/hostedtoolcache
+              /opt/pipx*
+              /usr/local.purge
+            )
+          fi
+          if [[ "${protocol_level}" -ge 3 ]]; then
+            trees+=(
+              /usr/lib/heroku
+              /usr/share/apache-*
+              /usr/share/az_*
+              /usr/share/gradle-*
+              /usr/share/kotlinc
+              /usr/share/miniconda
+              /usr/share/sbt
+              /usr/share/swift
+            )
+          fi
+          shopt -u nullglob
+          if [[ "${#trees[@]}" -gt 0 ]]; then
+            unowned_paths "${trees[@]}"
+          fi
+        }
+
+        # Grow /nix with the free space of / less the safe haven. The purge
+        # calls this after each phase that frees space. Each call that finds
+        # enough space adds one more disk image to the /nix pool.
+        function add_expansion_disk() {
+          local disk_image disk_size free_space loop_dev loop_num
+          free_space=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
+          echo "Free space of /: ${free_space}MB"
+
+          # Create an expansion disk only when suitable free space exists
+          if [[ "${free_space}" -le $((root_safe_haven + 2048)) ]]; then
+            echo "Not enough free space on / to grow /nix"
+            return 0
+          fi
+
+          # Calculate the size of the expansion disk, reserving the safe haven
+          disk_size=$((free_space - root_safe_haven))
+          echo "Creating expansion disk of ${disk_size}MB in /"
+          loop_dev=$(sudo losetup --find)
+          loop_num=${loop_dev##*/loop}
+          disk_image="/disk${loop_num}.img"
+          if sudo fallocate -l "${disk_size}M" "${disk_image}"; then
+            sudo losetup "${loop_dev}" "${disk_image}"
+
+            # Add the new device to the pool
+            sudo btrfs device add --nodiscard "${loop_dev}" /nix
+            echo "Added expansion disk ${disk_image} (${loop_dev}, ${disk_size}MB) to /nix pool" >> "${expansion_dir}/expansion_done"
+            sudo btrfs filesystem show
           fi
         }
 
         # If carve is selected, claim space from / now
-        if [[ "$protocol_level" -eq 1 ]]; then
-          echo "Disk space has been carved out" > $expansion_dir/carve_done
+        if [[ "${protocol_level}" -eq 1 ]]; then
+          echo "Disk space has been carved out" > "${expansion_dir}/carve_done"
+          add_expansion_disk
+        fi
+
+        # Delete the trees that dpkg does not own, then grow /nix at once
+        if [[ "${protocol_level}" -ge 2 ]]; then
+          mapfile -t trees < <(fast_trees)
+          if [[ "${#trees[@]}" -gt 0 ]]; then
+            echo "Deleting trees that dpkg does not own: ${trees[*]}"
+            rmz_parallel "${trees[@]}"
+          fi
+          echo "Fast purge complete" > "${expansion_dir}/fast_done"
           add_expansion_disk
         fi
 
         # Cleanse docker
-        if [[ "$protocol_level" -ge 2 ]]; then
+        if [[ "${protocol_level}" -ge 2 ]]; then
           for CRUFT in $(docker image ls --format '{{.ID}}'); do
             docker rmi --force "${CRUFT}" || true
           done
           docker system prune --all --force
           remove_packages 'docker.*'
           sudo rmz -f /usr/bin/docker* /var/lib/docker
-          echo "Cleanse docker complete" > $expansion_dir/docker_done
+          echo "Cleanse docker complete" > "${expansion_dir}/docker_done"
         fi
 
         # Cleanse snap
-        if [[ "$protocol_level" -ge 2 ]]; then
+        if [[ "${protocol_level}" -ge 2 ]]; then
           remove_packages snapd
           sudo rmz -f \
             /snap \
@@ -356,11 +448,11 @@ runs:
             /var/snap \
             /var/lib/snapd \
             "${HOME}/snap"
-          echo "Cleanse snap complete" > $expansion_dir/snap_done
+          echo "Cleanse snap complete" > "${expansion_dir}/snap_done"
         fi
 
         # Cleanse apt
-        if [[ "$protocol_level" -ge 2 ]]; then
+        if [[ "${protocol_level}" -ge 2 ]]; then
           sudo tee /etc/dpkg/dpkg.cfg.d/01_nocruft > /dev/null << 'APTCFG'
         path-exclude /usr/share/doc/*
         path-exclude /usr/share/fonts/*
@@ -369,7 +461,7 @@ runs:
         path-exclude /usr/share/man/*
         APTCFG
 
-          if [[ "$protocol_level" -ge 3 ]]; then
+          if [[ "${protocol_level}" -ge 3 ]]; then
             remove_packages \
               'apache2.*' \
               'aspnetcore-.*' \
@@ -424,11 +516,11 @@ runs:
 
           sudo apt-get -y autoremove --purge
           sudo apt-get -y clean
-          echo "Cleanse apt complete" > $expansion_dir/apt_done
+          echo "Cleanse apt complete" > "${expansion_dir}/apt_done"
         fi
 
         # Cleave
-        if [[ "$protocol_level" -ge 2 ]]; then
+        if [[ "${protocol_level}" -ge 2 ]]; then
           sudo rmz -f \
             "${HOME}/.rustup" \
             "${HOME}/.cargo" \
@@ -441,11 +533,11 @@ runs:
             /opt/google \
             /opt/mssql-tools \
             /usr/local.purge
-          echo "Cleave complete" > $expansion_dir/cleave_done
+          echo "Cleave complete" > "${expansion_dir}/cleave_done"
         fi
 
         # Rampage
-        if [[ "$protocol_level" -ge 3 ]]; then
+        if [[ "${protocol_level}" -ge 3 ]]; then
           sudo rmz -f \
             /usr/bin/kotlin* \
             /usr/lib/heroku \
@@ -468,16 +560,16 @@ runs:
             /var/lib/gems \
             /var/lib/mysql \
             /var/lib/ubuntu-advantage
-          echo "Rampage complete" > $expansion_dir/rampage_done
+          echo "Rampage complete" > "${expansion_dir}/rampage_done"
         fi
 
-        # Claim the space from / for purging
-        if [[ "$protocol_level" -ge 2 ]]; then
-          echo "The Purge Is Complete!" > $expansion_dir/purge_done
+        # Claim the space that the Docker, apt, and later rmz work freed
+        if [[ "${protocol_level}" -ge 2 ]]; then
+          echo "The Purge Is Complete!" > "${expansion_dir}/purge_done"
           add_expansion_disk
         fi
 
-        echo "Everything completed" > $expansion_dir/all_done
+        echo "Everything completed" > "${expansion_dir}/all_done"
         EOF
 
         # Make script executable
