@@ -64,6 +64,30 @@ jobs:
           echo "Hello Nix" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
           # Build a package to ensure the Nix store is functional
           nix build "https://flakehub.com/f/NixOS/nixpkgs/*#hello"
+      - name: Measure the compression of /nix
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+          BTRFS_COMPRESSION: ${{ matrix.btrfs-compression || 'zstd:1' }}
+          RUNNER_LABEL: ${{ matrix.os }}
+        run: |
+          # compsize reads Btrfs extents through an ioctl that needs root, so
+          # build it as the runner user and run it with sudo. Warn and carry
+          # on when it cannot run.
+          if ! compsize_out="$(nix build --no-link --print-out-paths "https://flakehub.com/f/NixOS/nixpkgs/*#compsize")"; then
+            echo "::warning::Could not build compsize, so the compression of /nix is not measured"
+            exit 0
+          fi
+          if ! report="$(sudo "${compsize_out}/bin/compsize" -x /nix)"; then
+            echo "::warning::compsize could not read /nix, so the compression of /nix is not measured"
+            exit 0
+          fi
+          echo "${report}"
+          read -r perc disk_usage uncompressed _ < <(awk '$1 == "TOTAL" { print $2, $3, $4 }' <<< "${report}") || true
+          if [[ -z "${uncompressed:-}" ]]; then
+            echo "::warning::compsize printed no TOTAL line for /nix"
+            exit 0
+          fi
+          echo "compsize /nix (${HATCHET_PROTOCOL}, ${BTRFS_COMPRESSION}, ${RUNNER_LABEL}): disk usage ${disk_usage}, uncompressed ${uncompressed}, ${perc} of the uncompressed size" >> "${GITHUB_STEP_SUMMARY}"
   nix-quick-install:
     name: nix-quick-action (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
