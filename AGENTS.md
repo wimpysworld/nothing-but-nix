@@ -103,7 +103,7 @@ gh run list --workflow=test.yaml --limit 5
 The `test.yaml` workflow validates:
 - All four hatchet protocols (holster, carve, cleave, rampage)
 - Ubuntu 22.04, 24.04 and 26.04 on x64 with all three installers
-- Ubuntu 24.04 and 26.04 on arm64 with `DeterminateSystems/determinate-nix-action` only, to keep the matrix small
+- Ubuntu 24.04 and 26.04 on arm64 with `DeterminateSystems/determinate-nix-action` for every protocol, and with `cachix/install-nix-action` for holster only, with `nix-permission-edict` true and false. The cachix jobs test the multi-user installer, which runs `chown -R root:nixbld /nix` (#57). One protocol keeps the matrix small.
 - `btrfs-compression: zstd:-1` in the `determinate-nix-action` job for holster on `ubuntu-26.04`. One `include` entry adds the value to that existing job, and a step checks that `/nix` has the `compress=zstd:-1` mount option.
 - Three popular Nix installers:
   - DeterminateSystems/determinate-nix-action
