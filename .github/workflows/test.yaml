@@ -117,10 +117,64 @@ jobs:
           echo "Hello Nix" | nix run "nixpkgs#neo-cowsay"
           # Build a package to ensure the Nix store is functional
           nix build "nixpkgs#hello"
+  background-purge:
+    name: background purge (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-26.04]
+        hatchet-protocol: [cleave, rampage]
+      fail-fast: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: ${{ matrix.hatchet-protocol }}
+          witness-carnage: false
+      - name: Check TMPDIR
+        run: bash ./.github/actions/this/.github/scripts/check-tmpdir.sh
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - name: Nix
+        run: |
+          nix --version
+          # Build a package whilst the purge runs in the background
+          nix build "https://flakehub.com/f/NixOS/nixpkgs/*#hello"
+      - name: Wait for the background purge
+        timeout-minutes: 11
+        run: |
+          expansion_dir="${HOME}/.expansion"
+          # The purge writes purge_seconds when it exits, after all_done on
+          # success. Check every 5 seconds for at most 10 minutes.
+          for _ in $(seq 1 120); do
+            if [[ -s "${expansion_dir}/purge_seconds" ]]; then
+              if [[ -e "${expansion_dir}/all_done" ]]; then
+                echo "The background purge finished in $(cat "${expansion_dir}/purge_seconds") seconds"
+                exit 0
+              fi
+              echo "::error::The background purge failed"
+              cat "${expansion_dir}/expansion.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::The background purge did not finish within 10 minutes"
+          cat "${expansion_dir}/expansion.log"
+          exit 1
+      - name: Check /nix volume
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+        run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
   sentinel:
     name: "👁️ Sentinel"
     if: always()
-    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action]
+    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
