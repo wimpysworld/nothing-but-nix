@@ -30,7 +30,7 @@ inputs:
     default: 'zstd:1'
 outputs:
   root-free-bytes:
-    description: 'Free bytes on the / filesystem before the action purges anything'
+    description: 'Free bytes on the / filesystem, or on /System/Volumes/Data on macOS, before the action purges anything'
     value: ${{ steps.survey.outputs.root-free-bytes }}
   nix-size-bytes:
     description: 'Size in bytes of /nix when the action finishes. In background mode the purge can grow /nix later.'
@@ -47,14 +47,36 @@ runs:
     - name: The Checks
       id: environment-check
       shell: bash
+      env:
+        ROOT_SAFE_HAVEN: ${{ inputs.root-safe-haven }}
+        MNT_SAFE_HAVEN: ${{ inputs.mnt-safe-haven }}
+        NIX_PERMISSION_EDICT: ${{ inputs.nix-permission-edict }}
+        BTRFS_COMPRESSION: ${{ inputs.btrfs-compression }}
       run: |
-        # Check for macOS/Darwin - warn but don't fail
+        # Check for macOS/Darwin. Apple silicon is supported. Intel runners
+        # skip with a notice, and the workflow continues.
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          echo "is_supported=false" >> "${GITHUB_OUTPUT}"
-          echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
-          echo "ℹ️  macOS/Darwin runners are not supported yet. They can start with only 40 to 47 GB free, so a large Nix store can still run out of space."
-          echo "ℹ️  This action will be skipped and your workflow will continue normally."
-          exit 0
+          if [[ "$(uname -m)" != "arm64" ]]; then
+            echo "is_supported=false" >> "${GITHUB_OUTPUT}"
+            echo "⚠️  Nothing but Nix supports macOS on Apple silicon (arm64) only, and this runner is $(uname -m)."
+            echo "ℹ️  Nixpkgs is deprecating x86_64-darwin, so Intel macOS runners are not supported."
+            echo "ℹ️  This action will be skipped and your workflow will continue normally."
+            exit 0
+          fi
+          # These inputs size or format the Btrfs volume on Linux. macOS has
+          # no such volume, because the Nix installer creates an APFS volume.
+          if [[ "$(tr '[:upper:]' '[:lower:]' <<< "${ROOT_SAFE_HAVEN}")" != "auto" ]]; then
+            echo "::notice::root-safe-haven does nothing on macOS, so the action ignores '${ROOT_SAFE_HAVEN}'"
+          fi
+          if [[ "${MNT_SAFE_HAVEN}" != "1024" ]]; then
+            echo "::notice::mnt-safe-haven does nothing on macOS, so the action ignores '${MNT_SAFE_HAVEN}'"
+          fi
+          if [[ "${NIX_PERMISSION_EDICT}" != "false" ]]; then
+            echo "::notice::nix-permission-edict does nothing on macOS, so the action ignores '${NIX_PERMISSION_EDICT}'"
+          fi
+          if [[ "${BTRFS_COMPRESSION}" != "zstd:1" ]]; then
+            echo "::notice::btrfs-compression does nothing on macOS, so the action ignores '${BTRFS_COMPRESSION}'"
+          fi
         fi
 
         # Check for Windows - warn but don't fail
@@ -147,9 +169,12 @@ runs:
         # Resolve the root safe haven. Holster and carve keep Docker and the
         # runner toolchains, so auto reserves more of / for them. On small
         # disks, auto takes at most 25% of the free space of /, but never
-        # less than 2048MB.
+        # less than 2048MB. macOS has no Btrfs volume, so it has no safe
+        # haven.
         root_safe_haven="$(tr '[:upper:]' '[:lower:]' <<< "${ROOT_SAFE_HAVEN}")"
-        if [[ "${root_safe_haven}" == "auto" ]]; then
+        if [[ "${RUNNER_OS}" != "Linux" ]]; then
+          root_safe_haven=""
+        elif [[ "${root_safe_haven}" == "auto" ]]; then
           if [[ "${protocol_level}" -le 1 ]]; then
             root_safe_haven=10240
           else
@@ -187,11 +212,18 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ')
-        echo "Free space of / before the purge: ${root_free_bytes} bytes"
+        # On macOS, every volume of the APFS container shares its free space,
+        # and the Data volume holds what the purge deletes.
+        if [[ "${RUNNER_OS}" == "macOS" ]]; then
+          root_free_bytes=$(( $(df -k /System/Volumes/Data | awk 'NR == 2 { print $4 }') * 1024 ))
+          echo "Free space of /System/Volumes/Data before the purge: ${root_free_bytes} bytes"
+        else
+          root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ')
+          echo "Free space of / before the purge: ${root_free_bytes} bytes"
+        fi
         echo "root-free-bytes=${root_free_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Setup
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 1
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 1
       shell: bash
       run: |
         # rmz from Fast Unix Commands, pinned to one release. Check the
@@ -221,7 +253,7 @@ runs:
         rm -rf "${rmz_dir}"
         rmz --version
     - name: The Volume
-      if: steps.environment-check.outputs.is_supported == 'true'
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       env:
         BTRFS_COMPRESSION: ${{ inputs.btrfs-compression }}
@@ -348,7 +380,7 @@ runs:
         mkdir -p "${HOME}/.expansion"
         echo "Initial volume created" | tee "${HOME}/.expansion/holster_done"
     - name: The Local
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
       shell: bash
       run: |
         # Nix is often installed in /usr/local, so we need to ensure that it is purged early.
@@ -357,7 +389,7 @@ runs:
         sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src} || true
     - name: The Purge
       id: purge
-      if: steps.environment-check.outputs.is_supported == 'true'
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
         cat > /tmp/expand_nix_volume.sh << 'EOF'
@@ -773,7 +805,7 @@ runs:
         echo "nix-size-bytes=${nix_size_bytes}" >> "${GITHUB_OUTPUT}"
         echo "nix-avail-bytes=${nix_avail_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Post
-      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
+      if: steps.environment-check.outputs.is_supported == 'true'
       # v3
       uses: srz-zumix/post-run-action@42756f7452b9439d0365b7e087b2c364f54209c6
       with:
@@ -781,19 +813,6 @@ runs:
         post-run: |
           expansion_dir="${HOME}/.expansion"
           protocol=$(cat "${expansion_dir}/protocol" 2>/dev/null || echo "unknown")
-          runner_desc="$(lsb_release -ds 2>/dev/null || echo "${RUNNER_OS}") $(uname -m)"
-          nix_size="n/a"
-          nix_avail="n/a"
-          if findmnt -n --mountpoint /nix > /dev/null &&
-            read -r nix_size_bytes nix_avail_bytes < <(df -B1 --output=size,avail /nix | tail -n +2); then
-            nix_size=$(awk -v b="${nix_size_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
-            nix_avail=$(awk -v b="${nix_avail_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
-          fi
-          root_free="n/a"
-          root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ' || true)
-          if [[ "${root_free_bytes}" =~ ^[0-9]+$ ]]; then
-            root_free=$(awk -v b="${root_free_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
-          fi
           purge_seconds=$(cat "${expansion_dir}/purge_seconds" 2>/dev/null || echo "n/a")
           if [[ -e "${expansion_dir}/all_done" ]]; then
             purge_finished="yes"
@@ -802,19 +821,34 @@ runs:
           else
             purge_finished="no, still running"
           fi
-          echo "Protocol: ${protocol}, runner: ${runner_desc}, /nix size: ${nix_size}, /nix available: ${nix_avail}, / free: ${root_free}, purge seconds: ${purge_seconds}, purge finished: ${purge_finished}"
-          if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-            {
-              echo "| Protocol | Runner | /nix size | /nix available | / free | Purge seconds | Purge finished |"
-              echo "| --- | --- | --- | --- | --- | --- | --- |"
-              echo "| ${protocol} | ${runner_desc} | ${nix_size} | ${nix_avail} | ${root_free} | ${purge_seconds} | ${purge_finished} |"
-            } >> "${GITHUB_STEP_SUMMARY}"
-          fi
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            runner_desc="$(lsb_release -ds 2>/dev/null || echo "${RUNNER_OS}") $(uname -m)"
+            nix_size="n/a"
+            nix_avail="n/a"
+            if findmnt -n --mountpoint /nix > /dev/null &&
+              read -r nix_size_bytes nix_avail_bytes < <(df -B1 --output=size,avail /nix | tail -n +2); then
+              nix_size=$(awk -v b="${nix_size_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+              nix_avail=$(awk -v b="${nix_avail_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+            fi
+            root_free="n/a"
+            root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ' || true)
+            if [[ "${root_free_bytes}" =~ ^[0-9]+$ ]]; then
+              root_free=$(awk -v b="${root_free_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+            fi
+            echo "Protocol: ${protocol}, runner: ${runner_desc}, /nix size: ${nix_size}, /nix available: ${nix_avail}, / free: ${root_free}, purge seconds: ${purge_seconds}, purge finished: ${purge_finished}"
+            if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+              {
+                echo "| Protocol | Runner | /nix size | /nix available | / free | Purge seconds | Purge finished |"
+                echo "| --- | --- | --- | --- | --- | --- | --- |"
+                echo "| ${protocol} | ${runner_desc} | ${nix_size} | ${nix_avail} | ${root_free} | ${purge_seconds} | ${purge_finished} |"
+              } >> "${GITHUB_STEP_SUMMARY}"
+            fi
 
-          # The workspace, caches, and toolchains still write to /, and
-          # the root safe haven is all that the purge leaves there.
-          if [[ "${root_free_bytes}" =~ ^[0-9]+$ && "${root_free_bytes}" -lt 1073741824 ]]; then
-            echo "::warning::/ has less than 1 GiB free at the end of the job (${root_free_bytes} bytes). Raise root-safe-haven to keep more space on /."
+            # The workspace, caches, and toolchains still write to /, and
+            # the root safe haven is all that the purge leaves there.
+            if [[ "${root_free_bytes}" =~ ^[0-9]+$ && "${root_free_bytes}" -lt 1073741824 ]]; then
+              echo "::warning::/ has less than 1 GiB free at the end of the job (${root_free_bytes} bytes). Raise root-safe-haven to keep more space on /."
+            fi
           fi
 
           # The protocol file exists only when the purge started.
@@ -829,6 +863,12 @@ runs:
           fi
 
           ls -ltr "${expansion_dir}"/*_done || true
+
+          # The rest reports the disk images and the Btrfs pool of /nix,
+          # which exist on Linux only.
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            exit 0
+          fi
           all_disks=()
 
           # Check for disks in /mnt directory
