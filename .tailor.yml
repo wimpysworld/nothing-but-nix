@@ -102,7 +102,7 @@ ruleset:
           - squash
           - rebase
     required_status_checks:
-      enabled: false
+      enabled: true
       parameters:
         # Require branches to be up to date before merging.
         strict_required_status_checks_policy: false
@@ -111,7 +111,9 @@ ruleset:
         # context is the check name as shown on a pull request. For a GitHub
         # Actions job that is the job's name. integration_id is optional and
         # restricts the check to one app; 15368 is GitHub Actions.
-        required_status_checks: []
+        required_status_checks:
+          - context: gate
+            integration_id: 15368
     code_scanning:
       enabled: false
       parameters:
