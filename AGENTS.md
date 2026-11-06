@@ -2,20 +2,22 @@
 
 ## Project Overview
 
-This is a GitHub Actions composite action that purges bloat from Ubuntu runners to maximise disk space for Nix. It creates a `/nix` volume with about 75GiB to 129GiB available on public x64 runners and about 96GiB to 129GiB on public arm64 runners. A stock public runner has about 86-88GiB free on `/` (x64) or about 106GiB (arm64). Btrfs `zstd:1` compression lets the store hold more than the raw size, and on x64 cleave and rampage add about 38-53GiB. The figures come from public GitHub-hosted runners in November 2026 and change with the runner image. The action works by:
+This is a GitHub Actions composite action that purges bloat from Ubuntu runners, and from macOS runners on Apple silicon, to maximise disk space for Nix. It creates a `/nix` volume with about 75GiB to 129GiB available on public x64 runners and about 96GiB to 129GiB on public arm64 runners. A stock public runner has about 86-88GiB free on `/` (x64) or about 106GiB (arm64). Btrfs `zstd:1` compression lets the store hold more than the raw size, and on x64 cleave and rampage add about 38-53GiB. The figures come from public GitHub-hosted runners in November 2026 and change with the runner image. The action works by:
 
 1. Creating a BTRFS filesystem on loop devices using free space from `/mnt`, which shares the root disk on current images
 2. Purging unnecessary software in the background (Docker images, language runtimes, documentation, etc.)
 3. Dynamically expanding the `/nix` volume as space becomes available
 
+On macOS the action only frees space on the Data volume of the shared APFS container. The Nix installer creates the `Nix Store` APFS volume afterwards from that free space. See [macOS](#macos).
+
 The action is production-ready and intended for use in GitHub Actions workflows before installing Nix.
 
 ## Technology Stack
 
-- **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS, Windows, and container runners such as `ubuntu-slim` gracefully skip)
+- **Platform**: GitHub Actions composite action (Ubuntu runners and macOS runners on Apple silicon. Intel macOS, Windows, and container runners such as `ubuntu-slim` gracefully skip)
 - **Shell**: Bash (embedded in `action.yml`)
 - **Filesystem**: BTRFS with single profile (`-d single -m single`), `zstd:1` compression by default, loop devices
-- **Tools**: `rmz` (Fast Unix Commands), `systemctl`, APT, snap
+- **Tools**: `rmz` (Fast Unix Commands), `systemctl`, APT, snap, and on macOS `xcrun simctl` and `xcode-select`
 - **Dependencies**: Standard Ubuntu utilities (`df`, `losetup`, `fallocate`, `mkfs.btrfs`)
 
 ## Project Structure
@@ -29,7 +31,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
     ├── actionlint.yaml     # Runner labels that actionlint does not know yet
     ├── scripts/            # Checks that the test jobs run after the action, and lint.sh
     └── workflows/
-        ├── test.yaml       # Integration tests with multiple Nix installers, and skip tests on macOS and Windows
+        ├── test.yaml       # Integration tests with multiple Nix installers on Ubuntu and macOS, and skip tests on Intel macOS and Windows
         └── debug.yaml      # Debugging workflow for space usage analysis
 ```
 
@@ -46,22 +48,22 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 The action follows a specific execution order:
 
-1. **The Checks**: Validate environment (macOS/Windows graceful skip, loop device graceful skip, Ubuntu on Linux, GitHub Actions, no pre-existing `/nix`)
-2. **The Hatchet Protocol**: Set purge level (0-3)
-3. **The Survey**: Record free bytes on `/` before any purge
+1. **The Checks**: Validate environment (Intel macOS and Windows graceful skip, a notice for each input that does nothing on macOS, loop device graceful skip, Ubuntu on Linux, GitHub Actions, no pre-existing `/nix`)
+2. **The Hatchet Protocol**: Set purge level (0-3). It resolves no root safe haven on macOS
+3. **The Survey**: Record free bytes on `/`, or on `/System/Volumes/Data` on macOS, before any purge
 4. **The Setup**: Download, check, and install the `rmz` binary (protocol level ≥1)
-5. **The Volume**: Create initial BTRFS volume from `/mnt` free space
-6. **The Local**: Purge `/usr/local` early (protocol level ≥2)
-7. **The Purge**: Execute background expansion script and time it
-8. **The Post**: Report final disk usage and expansion status, and write one row to the job summary
+5. **The Volume**: Create initial BTRFS volume from `/mnt` free space (Linux only)
+6. **The Local**: Purge `/usr/local` early (protocol level ≥2, Linux only)
+7. **The Purge**: Execute background expansion script and time it. Two steps have this name: `purge` runs on Linux and `purge-macos` on macOS
+8. **The Post**: Report final disk usage and expansion status, and write one row to the job summary. The disk image and Btrfs reports run on Linux only
 
 ### Outputs
 
-- `root-free-bytes`: free bytes on `/` before the purge
-- `nix-size-bytes` and `nix-avail-bytes`: size and available bytes of `/nix` when the action finishes. In background mode the purge can grow `/nix` after that.
-- `purge-seconds`: duration of the purge. It is empty in background mode, because the purge is still running when the action finishes.
+- `root-free-bytes`: free bytes on `/` before the purge, or on `/System/Volumes/Data` on macOS
+- `nix-size-bytes` and `nix-avail-bytes`: size and available bytes of `/nix` when the action finishes. In background mode the purge can grow `/nix` after that. Both are empty on macOS, because the Nix installer creates `/nix` after the action.
+- `purge-seconds`: duration of the purge. It is empty in background mode, because the purge is still running when the action finishes. The output takes the value of whichever purge step ran.
 
-The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, the free space of `/` at the end of the job, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`, and prints the same values to the log. When `/` has less than 1 GiB free, the post step writes a `::warning::`. When the purge started but did not succeed, the post step writes a `::warning::` and prints the last 50 lines of `expansion.log`.
+The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, the free space of `/` at the end of the job, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`, and prints the same values to the log. On macOS the row has the free space of the Data volume before the purge (from `data_free_before_bytes`) and at the end of the job instead of the `/nix` and `/` columns. When `/` has less than 1 GiB free on Linux, the post step writes a `::warning::`. When the purge started but did not succeed, the post step writes a `::warning::` and prints the last 50 lines of `expansion.log`.
 
 The purge runs one `apt-get remove --purge --autoremove` for the Docker and snapd packages and, for rampage, the Rampage list, then `apt-get clean`. `apt_get` runs it with `DEBIAN_FRONTEND=noninteractive` and a dpkg lock timeout. The call selects the classic solver with `-o APT::Solver=internal`. On Ubuntu 26.04, the apt 3 solver does not remove the packages that depend on the removed ones, and it fails. While the call runs, the purge sets `update_initramfs=no` in `/etc/initramfs-tools/update-initramfs.conf`, so that dpkg triggers do not rebuild the initramfs, and restores the file afterwards, also on failure. Images that use dracut do not have this file, and the purge leaves them alone. The purge passes only installed packages to `apt-get`. `installed_packages` matches each extended regular expression against the whole package name, so a pattern that matches no installed package cannot stop the script under `set -e`.
 
@@ -76,8 +78,28 @@ The `btrfs-compression` input sets the `compress` mount option of the pool. The 
   - carve: the fast purge. It deletes the large trees in `fast_trees` that dpkg does not own (Rust, GHC, the tool cache, the Android SDK, .NET, and Swift), then grows `/nix`. No apt, Docker, or snap work.
   - cleave: carve plus `/usr/local`, Docker, snapd, `apt-get autoremove`, and the Cleave `rmz` list
   - rampage: cleave plus the Rampage apt list and the Rampage `rmz` list
+- **macOS protocols**: see [macOS](#macos)
 - **Marker files**: Expansion progress tracked via `${HOME}/.expansion/*_done`
 - **Disk images**: `/mnt/disk${loop_num}.img` (initial) and `/disk${loop_num}.img` (expansion)
+
+### macOS
+
+The Checks accept macOS on arm64 only. On x86_64 they print a notice, set `is_supported=false`, and exit 0, because Nixpkgs is deprecating `x86_64-darwin`. `root-safe-haven`, `mnt-safe-haven`, `nix-permission-edict`, and `btrfs-compression` do nothing on macOS, and The Checks print one `::notice::` for each one that has a value other than its default. The action does not set `TMPDIR` and does not create `/nix/build` on macOS.
+
+The macOS purge (`purge-macos`) never creates an APFS volume. The Determinate installer refuses to install over an existing `Nix Store` volume. It moves each target with `sudo mv` into `/private/var/tmp/nothing-but-nix.staging`, which is a rename on the Data volume, then deletes the staging directory with `rmz`. On APFS, `rmz` can fail with "Directory not empty", so `delete_staging` runs `rmz` again, then clears the `uchg` and `schg` flags and runs it once more. If paths still stay, it prints them and their size with `du` and a `::warning::`, and the purge does not fail. `stage` skips a path that does not exist or that holds a mounted volume. It never moves `/Library/Developer/CommandLineTools`, because `actions/checkout` needs `/usr/bin/git`, or a path under `/System`, which SIP protects.
+
+| Protocol | Moved at once (`early_targets`) | Moved after `xcrun simctl runtime delete all` (`late_targets`) |
+| --- | --- | --- |
+| holster | Nothing. The action reports the free space of the Data volume | Nothing |
+| carve | `/Users/runner/hostedtoolcache`, `~/Library/Android/sdk`, `/usr/local/share/dotnet`, `~/.dotnet`, `~/.ghcup`, `/Library/Frameworks/Mono.framework`, `/Library/Frameworks/Xamarin*` | Nothing, and no `simctl` |
+| cleave | carve plus every `/Applications/Xcode*.app` except the default Xcode, `~/Library/Caches`, `~/.rustup`, `~/.cargo` | `~/Library/Developer` |
+| rampage | cleave plus `/opt/homebrew`, `/Applications/Google Chrome.app`, `/Applications/Firefox.app`, `/Applications/Microsoft Edge.app` | cleave plus the default Xcode and `/Library/Developer/CoreSimulator`, then `sudo xcode-select --switch /Library/Developer/CommandLineTools` |
+
+The default Xcode is the bundle that `xcode-select -p` points at. `xcode_bundles` compares physical paths, so the `/Applications/Xcode.app` symlink counts as the default too. On macOS 26 and later the simulator runtimes are in `/System/Library/AssetsV2`, which SIP protects, so only `xcrun simctl runtime delete all` can delete them. It needs the default Xcode, so the default Xcode and the simulator directories move after it.
+
+The moves of `early_targets` run in the step. With `witness-carnage: false`, `simctl`, the moves of `late_targets`, and the `rmz` delete run in the background, and the step ends at once. With `true` they run in the foreground. Both write `purge_seconds`, `all_done`, and `expansion.log` like the Linux purge.
+
+Rampage removes Homebrew, and with it Bash 5, so later `shell: bash` steps run `/bin/bash` 3.2. The macOS purge, The Post, and `check-macos.sh` must use no feature newer than Bash 3.2, for example no `mapfile`. The purge sets `shopt -s checkhash`, so that Bash does not run a remembered path under `/opt/homebrew` after the move.
 
 ## Testing
 
@@ -96,7 +118,7 @@ The script runs `actionlint` on the workflows, `shellcheck` on `.github/scripts/
 The action cannot be tested locally as it requires GitHub Actions runners. Test using workflow dispatch:
 
 ```bash
-# Trigger test workflow (tests all protocols on the Ubuntu x64 and arm64 runners in the matrix)
+# Trigger test workflow (tests all protocols on the Ubuntu x64 and arm64 runners and the macOS runners in the matrix)
 gh workflow run test.yaml
 
 # Trigger debug workflow (rampage protocol with large safe havens)
@@ -132,7 +154,15 @@ Each floor is about 10% under the lowest available space observed on public runn
 
 The `ubuntu-slim` job runs the action on `ubuntu-slim`, an unprivileged container runner with no loop devices and no mount support. It checks that the action skips, that the outputs are empty, and that `/nix` is not a Btrfs mount. The `👁️ Sentinel` job needs this job too.
 
-The `unsupported-os` job runs the action on `macos-latest` and `windows-latest`. It checks that the workflow continues, that the outputs are empty, and that `/nix` does not exist before Nix is installed. On macOS it then installs Nix with `DeterminateSystems/determinate-nix-action` and runs `neo-cowsay`. The `👁️ Sentinel` job needs this job too.
+The `unsupported-os` job runs the action on `macos-15-intel` and `windows-latest`. It checks that the workflow continues, that the outputs are empty, and that `/nix` does not exist. The job does not install Nix, because the Determinate Nix Installer does not support Intel macOS. The `👁️ Sentinel` job needs this job too.
+
+macOS runners are few, so the macOS matrix is small:
+
+- `macos`: `DeterminateSystems/determinate-nix-action` on `macos-15` and `macos-26` for every protocol, and `cachix/install-nix-action` on `macos-26` for holster and rampage, and `nixbuild/nix-quick-install-action` on `macos-26` for holster and cleave, all with `witness-carnage: true`. `nix-quick-install-action` does not get rampage, because rampage removes Homebrew and the installer needs `gtar` from Homebrew
+- `macos-background-purge`: rampage on `macos-26` with `witness-carnage: false`. It builds `hello` while the purge runs, then waits at most 10 minutes for `all_done`
+- `macos-preview`: rampage with `DeterminateSystems/determinate-nix-action` on `xcode-27`, the macOS 27 preview image. It has `continue-on-error: true` and is not in the needs of `👁️ Sentinel`, because it is a preview
+
+Each macOS job runs `.github/scripts/check-macos.sh <protocol> <root-free-bytes>`. The script checks that `/usr/bin/git --version` runs, that `xcode-select -p` points at a directory that exists, and that the free space of `/System/Volumes/Data` did not fall by more than 1 GiB for holster, or grew by at least 1 GiB for carve, cleave, and rampage. Then the job installs Nix and builds `hello`. The `👁️ Sentinel` job needs `macos` and `macos-background-purge`.
 
 The `background-purge` job runs the action with `witness-carnage: false` for carve, cleave, and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check with the floor for the protocol of the job. The `👁️ Sentinel` job needs this job too.
 
@@ -200,7 +230,7 @@ An expansion disk is only created if `free_space > (root_safe_haven + 2048)`. Th
 ## Security Considerations
 
 - **Privileged operations**: The action uses `sudo` extensively (requires runner permissions)
-- **Binary download**: The Setup downloads `rmz` 3.2.1 from GitHub releases with HTTPS and checks its SHA-256 before use. A mismatch fails the step with `::error::`. To move to a new release, change `RMZ_VERSION` and both `RMZ_SHA256` values together. Take each checksum from a `sha256sum` of the downloaded `x86_64-unknown-linux-gnu-rmz` and `aarch64-unknown-linux-gnu-rmz` assets, and compare it with the digest that `gh release view <tag> --repo SUPERCILEX/fuc --json assets` shows. Do not run the downloaded binaries to check them.
+- **Binary download**: The Setup downloads `rmz` 3.2.1 from GitHub releases with HTTPS and checks its SHA-256 before use. A mismatch fails the step with `::error::`. On macOS it downloads `aarch64-apple-darwin-rmz`, checks it with `shasum`, and installs it to `/usr/local/bin`, because SIP protects `/usr/bin`. To move to a new release, change `RMZ_VERSION` and all three `RMZ_SHA256` values together. Take each checksum from a `sha256sum` of the downloaded `x86_64-unknown-linux-gnu-rmz`, `aarch64-unknown-linux-gnu-rmz`, and `aarch64-apple-darwin-rmz` assets, and compare it with the digest that `gh release view <tag> --repo SUPERCILEX/fuc --json assets` shows. Do not run the downloaded binaries to check them.
 - **No secret handling**: The action does not interact with secrets or credentials
 - **Destructive operations**: Purging is irreversible; protocol selection is critical
 - **Loop device management**: Uses `losetup --find` to avoid conflicts
@@ -261,13 +291,13 @@ Before submitting changes:
 
 ## Constraints
 
-- **Ubuntu only**: Action checks for Ubuntu via `lsb_release -is`
-- **macOS graceful skip**: Action detects macOS/Darwin runners and exits gracefully with a warning (workflow continues)
+- **Ubuntu on Linux**: Action checks for Ubuntu via `lsb_release -is`
+- **macOS on Apple silicon only**: Action detects Intel macOS runners and exits gracefully with a notice (workflow continues)
 - **Windows graceful skip**: Action detects Windows runners and exits gracefully with a warning (workflow continues)
-- **Loop device graceful skip**: On Linux, The Checks needs `/dev/loop-control` and a successful `sudo -n losetup --find`. When either fails, the action prints the reason, sets `is_supported=false`, and exits 0, like the macOS branch. Later steps, The Post included, then skip, and the outputs stay empty. This covers container runners such as `ubuntu-slim`
+- **Loop device graceful skip**: On Linux, The Checks needs `/dev/loop-control` and a successful `sudo -n losetup --find`. When either fails, the action prints the reason, sets `is_supported=false`, and exits 0, like the Intel macOS branch. Later steps, The Post included, then skip, and the outputs stay empty. This covers container runners such as `ubuntu-slim`
 - **Pre-Nix only**: Must run before Nix installation (checks for `/nix` directory)
 - **GitHub Actions only**: Requires `$GITHUB_ACTIONS` environment variable
-- **BTRFS required**: Ubuntu runners include BTRFS tools by default
+- **BTRFS required on Linux**: Ubuntu runners include BTRFS tools by default
 - **Loop device availability**: Assumes sufficient loop devices available via `losetup --find`
 
 ## Resources

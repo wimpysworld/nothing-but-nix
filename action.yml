@@ -30,31 +30,53 @@ inputs:
     default: 'zstd:1'
 outputs:
   root-free-bytes:
-    description: 'Free bytes on the / filesystem before the action purges anything'
+    description: 'Free bytes on the / filesystem, or on /System/Volumes/Data on macOS, before the action purges anything'
     value: ${{ steps.survey.outputs.root-free-bytes }}
   nix-size-bytes:
-    description: 'Size in bytes of /nix when the action finishes. In background mode the purge can grow /nix later.'
+    description: 'Size in bytes of /nix when the action finishes. In background mode the purge can grow /nix later. Empty on macOS, where the Nix installer creates /nix after the action.'
     value: ${{ steps.purge.outputs.nix-size-bytes }}
   nix-avail-bytes:
-    description: 'Available bytes on /nix when the action finishes. In background mode the purge can grow /nix later.'
+    description: 'Available bytes on /nix when the action finishes. In background mode the purge can grow /nix later. Empty on macOS, where the Nix installer creates /nix after the action.'
     value: ${{ steps.purge.outputs.nix-avail-bytes }}
   purge-seconds:
     description: 'Duration of the purge in seconds. Empty in background mode, where the post step reports it.'
-    value: ${{ steps.purge.outputs.purge-seconds }}
+    value: ${{ steps.purge.outputs.purge-seconds || steps.purge-macos.outputs.purge-seconds }}
 runs:
   using: composite
   steps:
     - name: The Checks
       id: environment-check
       shell: bash
+      env:
+        ROOT_SAFE_HAVEN: ${{ inputs.root-safe-haven }}
+        MNT_SAFE_HAVEN: ${{ inputs.mnt-safe-haven }}
+        NIX_PERMISSION_EDICT: ${{ inputs.nix-permission-edict }}
+        BTRFS_COMPRESSION: ${{ inputs.btrfs-compression }}
       run: |
-        # Check for macOS/Darwin - warn but don't fail
+        # Check for macOS/Darwin. Apple silicon is supported. Intel runners
+        # skip with a notice, and the workflow continues.
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          echo "is_supported=false" >> "${GITHUB_OUTPUT}"
-          echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
-          echo "ℹ️  macOS/Darwin runners are not supported yet. They can start with only 40 to 47 GB free, so a large Nix store can still run out of space."
-          echo "ℹ️  This action will be skipped and your workflow will continue normally."
-          exit 0
+          if [[ "$(uname -m)" != "arm64" ]]; then
+            echo "is_supported=false" >> "${GITHUB_OUTPUT}"
+            echo "⚠️  Nothing but Nix supports macOS on Apple silicon (arm64) only, and this runner is $(uname -m)."
+            echo "ℹ️  Nixpkgs is deprecating x86_64-darwin, so Intel macOS runners are not supported."
+            echo "ℹ️  This action will be skipped and your workflow will continue normally."
+            exit 0
+          fi
+          # These inputs size or format the Btrfs volume on Linux. macOS has
+          # no such volume, because the Nix installer creates an APFS volume.
+          if [[ "$(tr '[:upper:]' '[:lower:]' <<< "${ROOT_SAFE_HAVEN}")" != "auto" ]]; then
+            echo "::notice::root-safe-haven does nothing on macOS, so the action ignores '${ROOT_SAFE_HAVEN}'"
+          fi
+          if [[ "${MNT_SAFE_HAVEN}" != "1024" ]]; then
+            echo "::notice::mnt-safe-haven does nothing on macOS, so the action ignores '${MNT_SAFE_HAVEN}'"
+          fi
+          if [[ "${NIX_PERMISSION_EDICT}" != "false" ]]; then
+            echo "::notice::nix-permission-edict does nothing on macOS, so the action ignores '${NIX_PERMISSION_EDICT}'"
+          fi
+          if [[ "${BTRFS_COMPRESSION}" != "zstd:1" ]]; then
+            echo "::notice::btrfs-compression does nothing on macOS, so the action ignores '${BTRFS_COMPRESSION}'"
+          fi
         fi
 
         # Check for Windows - warn but don't fail
@@ -147,9 +169,12 @@ runs:
         # Resolve the root safe haven. Holster and carve keep Docker and the
         # runner toolchains, so auto reserves more of / for them. On small
         # disks, auto takes at most 25% of the free space of /, but never
-        # less than 2048MB.
+        # less than 2048MB. macOS has no Btrfs volume, so it has no safe
+        # haven.
         root_safe_haven="$(tr '[:upper:]' '[:lower:]' <<< "${ROOT_SAFE_HAVEN}")"
-        if [[ "${root_safe_haven}" == "auto" ]]; then
+        if [[ "${RUNNER_OS}" != "Linux" ]]; then
+          root_safe_haven=""
+        elif [[ "${root_safe_haven}" == "auto" ]]; then
           if [[ "${protocol_level}" -le 1 ]]; then
             root_safe_haven=10240
           else
@@ -187,8 +212,15 @@ runs:
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
-        root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ')
-        echo "Free space of / before the purge: ${root_free_bytes} bytes"
+        # On macOS, every volume of the APFS container shares its free space,
+        # and the Data volume holds what the purge deletes.
+        if [[ "${RUNNER_OS}" == "macOS" ]]; then
+          root_free_bytes=$(( $(df -k /System/Volumes/Data | awk 'NR == 2 { print $4 }') * 1024 ))
+          echo "Free space of /System/Volumes/Data before the purge: ${root_free_bytes} bytes"
+        else
+          root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ')
+          echo "Free space of / before the purge: ${root_free_bytes} bytes"
+        fi
         echo "root-free-bytes=${root_free_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Setup
       if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 1
@@ -196,32 +228,51 @@ runs:
       run: |
         # rmz from Fast Unix Commands, pinned to one release. Check the
         # download against the SHA-256 of the release asset before use.
+        # SIP protects /usr/bin on macOS, so rmz goes to /usr/local/bin there.
         RMZ_VERSION="3.2.1"
         ARCH=$(uname -m)
-        if [[ "$ARCH" == "x86_64" ]]; then
+        if [[ "${RUNNER_OS}" == "macOS" ]]; then
+          URL_ARCH="aarch64"
+          ASSET="aarch64-apple-darwin-rmz"
+          RMZ_SHA256="da01fabf7169daab1b115175fe816731a76f281291bd084a859e4266eec3970c"
+          RMZ_BIN="/usr/local/bin/rmz"
+        elif [[ "$ARCH" == "x86_64" ]]; then
           URL_ARCH="x86_64"
+          ASSET="x86_64-unknown-linux-gnu-rmz"
           RMZ_SHA256="e2c2c07e731d9422dfe3f14e17e010c6dd5f7a4ad54a9c9bcd141cb8a5ec4fb1"
+          RMZ_BIN="/usr/bin/rmz"
         elif [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then
           URL_ARCH="aarch64"
+          ASSET="aarch64-unknown-linux-gnu-rmz"
           RMZ_SHA256="62059f80a71715d6c4197c0729f157a9c1bbe537a5bdfa830397c47b3ae1ed74"
+          RMZ_BIN="/usr/bin/rmz"
         else
           echo "::error::Unsupported architecture for rmz: $ARCH"
           exit 1
         fi
 
-        DOWNLOAD_URL="https://github.com/SUPERCILEX/fuc/releases/download/${RMZ_VERSION}/${URL_ARCH}-unknown-linux-gnu-rmz"
-        rmz_dir="$(mktemp --directory)"
+        DOWNLOAD_URL="https://github.com/SUPERCILEX/fuc/releases/download/${RMZ_VERSION}/${ASSET}"
+        rmz_dir="$(mktemp -d)"
         curl --fail --silent --show-error --location --retry 3 -o "${rmz_dir}/rmz" "$DOWNLOAD_URL"
-        if ! echo "${RMZ_SHA256}  ${rmz_dir}/rmz" | sha256sum --check --quiet --strict -; then
+        # macOS has shasum but no sha256sum
+        function check_sha256() {
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            shasum --algorithm 256 --check --status
+          else
+            sha256sum --check --quiet --strict -
+          fi
+        }
+        if ! echo "${RMZ_SHA256}  ${rmz_dir}/rmz" | check_sha256; then
           echo "::error::The rmz ${RMZ_VERSION} download for ${URL_ARCH} does not match the expected SHA-256 ${RMZ_SHA256}"
           rm -rf "${rmz_dir}"
           exit 1
         fi
-        sudo install -m 0755 "${rmz_dir}/rmz" /usr/bin/rmz
+        sudo mkdir -p "${RMZ_BIN%/*}"
+        sudo install -m 0755 "${rmz_dir}/rmz" "${RMZ_BIN}"
         rm -rf "${rmz_dir}"
         rmz --version
     - name: The Volume
-      if: steps.environment-check.outputs.is_supported == 'true'
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       env:
         BTRFS_COMPRESSION: ${{ inputs.btrfs-compression }}
@@ -348,7 +399,7 @@ runs:
         mkdir -p "${HOME}/.expansion"
         echo "Initial volume created" | tee "${HOME}/.expansion/holster_done"
     - name: The Local
-      if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level >= 2
       shell: bash
       run: |
         # Nix is often installed in /usr/local, so we need to ensure that it is purged early.
@@ -357,7 +408,7 @@ runs:
         sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src} || true
     - name: The Purge
       id: purge
-      if: steps.environment-check.outputs.is_supported == 'true'
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
         cat > /tmp/expand_nix_volume.sh << 'EOF'
@@ -772,8 +823,216 @@ runs:
         echo "Size of /nix: ${nix_size_bytes} bytes, available: ${nix_avail_bytes} bytes"
         echo "nix-size-bytes=${nix_size_bytes}" >> "${GITHUB_OUTPUT}"
         echo "nix-avail-bytes=${nix_avail_bytes}" >> "${GITHUB_OUTPUT}"
+    - name: The Purge
+      id: purge-macos
+      if: runner.os == 'macOS' && steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      env:
+        PROTOCOL_LEVEL: ${{ steps.set-hatchet-protocol.outputs.level }}
+        PROTOCOL_NAME: ${{ steps.set-hatchet-protocol.outputs.name }}
+        WITNESS_CARNAGE: ${{ inputs.witness-carnage }}
+      run: |
+        # Rampage moves /opt/homebrew, so bash must look up each command again
+        # instead of running a path that it remembered before the move. After
+        # that move, /bin/bash 3.2 runs the later steps, so this script and
+        # The Post use no newer Bash features.
+        shopt -s checkhash nullglob
+        purge_start=$(date +%s)
+        expansion_dir="${HOME}/.expansion"
+        staging="/private/var/tmp/nothing-but-nix.staging"
+        clt="/Library/Developer/CommandLineTools"
+        mkdir -p "${expansion_dir}"
+        echo "${PROTOCOL_NAME}" > "${expansion_dir}/protocol"
+
+        function data_free_bytes() {
+          echo $(( $(df -k /System/Volumes/Data | awk 'NR == 2 { print $4 }') * 1024 ))
+        }
+        data_free_bytes > "${expansion_dir}/data_free_before_bytes"
+
+        # Print the physical path of a directory, with every symlink resolved
+        function physical_path() {
+          (cd -P "$1" 2> /dev/null && pwd -P)
+        }
+
+        # The default Xcode is the bundle that xcode-select points at.
+        # /Applications/Xcode.app is often a symlink to a versioned bundle, so
+        # compare physical paths.
+        default_xcode=""
+        developer_dir="$(xcode-select -p 2> /dev/null || true)"
+        if [[ "${developer_dir}" == */Contents/Developer ]]; then
+          default_xcode="$(physical_path "${developer_dir%/Contents/Developer}" || true)"
+        fi
+
+        # Print the Xcode bundles, and the symlinks to them, that are the
+        # default Xcode (default) or that are not (other).
+        function xcode_bundles() {
+          local app
+          for app in /Applications/Xcode*.app; do
+            if [[ -n "${default_xcode}" && "$(physical_path "${app}" || true)" == "${default_xcode}" ]]; then
+              if [[ "$1" == "default" ]]; then
+                echo "${app}"
+              fi
+            elif [[ "$1" == "other" ]]; then
+              echo "${app}"
+            fi
+          done
+        }
+
+        # Print the paths that the protocol moves to the staging directory
+        # at once.
+        function early_targets() {
+          if [[ "${PROTOCOL_LEVEL}" -ge 1 ]]; then
+            printf '%s\n' \
+              /Users/runner/hostedtoolcache \
+              "${HOME}/Library/Android/sdk" \
+              /usr/local/share/dotnet \
+              "${HOME}/.dotnet" \
+              "${HOME}/.ghcup" \
+              /Library/Frameworks/Mono.framework \
+              /Library/Frameworks/Xamarin*
+          fi
+          if [[ "${PROTOCOL_LEVEL}" -ge 2 ]]; then
+            xcode_bundles other
+            printf '%s\n' \
+              "${HOME}/Library/Caches" \
+              "${HOME}/.rustup" \
+              "${HOME}/.cargo"
+          fi
+          if [[ "${PROTOCOL_LEVEL}" -ge 3 ]]; then
+            printf '%s\n' \
+              /opt/homebrew \
+              "/Applications/Google Chrome.app" \
+              /Applications/Firefox.app \
+              "/Applications/Microsoft Edge.app"
+          fi
+        }
+
+        # Print the paths that the protocol moves after the simulator runtimes
+        # are deleted, because xcrun simctl needs the default Xcode and the
+        # simulator directories until then.
+        function late_targets() {
+          if [[ "${PROTOCOL_LEVEL}" -ge 2 ]]; then
+            echo "${HOME}/Library/Developer"
+          fi
+          if [[ "${PROTOCOL_LEVEL}" -ge 3 ]]; then
+            xcode_bundles default
+            echo /Library/Developer/CoreSimulator
+          fi
+        }
+
+        # Move one path into the staging directory. A move within the Data
+        # volume is a rename, so it is instant. Skip a path that does not
+        # exist or that holds a mounted volume. Never move the Command Line
+        # Tools, because /usr/bin/git needs them, or a path that SIP protects.
+        stage_count=0
+        function stage() {
+          local path="$1" mounts
+          case "${path}" in
+            "${clt}" | "${clt}"/* | /System | /System/*)
+              echo "::warning::The purge never moves ${path}"
+              return 0
+              ;;
+          esac
+          if [[ ! -e "${path}" && ! -L "${path}" ]]; then
+            echo "Not found, so skipped: ${path}"
+            return 0
+          fi
+          mounts="$(mount)"
+          if grep -qF -e " on ${path}/" -e " on ${path} (" <<< "${mounts}"; then
+            echo "::warning::A volume is mounted in ${path}, so the purge keeps it"
+            return 0
+          fi
+          stage_count=$((stage_count + 1))
+          if sudo mv "${path}" "${staging}/${stage_count}-${path##*/}"; then
+            echo "Moved ${path}"
+          else
+            echo "::warning::Could not move ${path}, so the purge keeps it"
+          fi
+        }
+
+        function stage_all() {
+          local path
+          while IFS= read -r path; do
+            stage "${path}"
+          done
+        }
+
+        # Delete the staging directory. On APFS, readdir can stop early when
+        # entries are deleted during the walk, so rmz can fail with
+        # "Directory not empty". Delete again, then clear the file flags and
+        # delete once more. Report what stays, but do not fail the purge.
+        function delete_staging() {
+          echo "Deleting ${staging}"
+          sudo rmz -f "${staging}" || true
+          if [[ -e "${staging}" ]]; then
+            echo "Deleting ${staging} again"
+            sudo rmz -f "${staging}" || true
+          fi
+          if [[ -e "${staging}" ]]; then
+            echo "Clearing the file flags in ${staging}"
+            sudo chflags -R nouchg,noschg "${staging}" || true
+            sudo rmz -f "${staging}" || true
+          fi
+          if [[ -e "${staging}" ]]; then
+            echo "::warning::rmz could not delete all of ${staging}, so these paths stay"
+            sudo du -h -d 1 "${staging}" || true
+          fi
+        }
+
+        # Delete the simulator runtimes, move the late targets, and delete
+        # the staging directory. A caller in an || list turns off set -e
+        # here, so check each essential command.
+        function delete_staged() {
+          if [[ "${PROTOCOL_LEVEL}" -ge 2 ]]; then
+            # On macOS 26 and later the runtimes are in /System/Library/AssetsV2,
+            # which SIP protects, so only simctl can delete them.
+            echo "Deleting the simulator runtimes"
+            if ! xcrun simctl runtime delete all; then
+              echo "::warning::xcrun simctl runtime delete all failed, so the simulator runtimes stay"
+            fi
+          fi
+          stage_all < <(late_targets)
+          # Rampage moves every Xcode, so point git and clang at the Command
+          # Line Tools.
+          if [[ "${PROTOCOL_LEVEL}" -ge 3 ]]; then
+            if ! sudo xcode-select --switch "${clt}"; then
+              echo "::warning::xcode-select could not switch to ${clt}"
+            fi
+          fi
+          if [[ "${PROTOCOL_LEVEL}" -ge 1 ]]; then
+            delete_staging
+          fi
+          echo "Free space of /System/Volumes/Data: $(data_free_bytes) bytes"
+          echo "Everything completed" > "${expansion_dir}/all_done"
+        }
+
+        # Time the purge. The post step reads purge_seconds, which appears
+        # when the purge exits, and all_done, which appears only on success.
+        function timed_purge() {
+          local purge_status=0
+          delete_staged || purge_status=$?
+          echo "$(( $(date +%s) - purge_start ))" > "${expansion_dir}/purge_seconds"
+          return "${purge_status}"
+        }
+
+        if [[ "${PROTOCOL_LEVEL}" -ge 1 ]]; then
+          sudo mkdir -p "${staging}"
+        fi
+        stage_all < <(early_targets)
+
+        # Execute based on witness-carnage setting
+        if [[ "${WITNESS_CARNAGE}" == "true" ]]; then
+          echo "😮 Displaying the carnage in real-time. This will block until completion."
+          timed_purge 2>&1 | tee "${expansion_dir}/expansion.log"
+          purge_seconds=$(cat "${expansion_dir}/purge_seconds")
+          echo "⏱️  The purge took ${purge_seconds} seconds"
+          echo "purge-seconds=${purge_seconds}" >> "${GITHUB_OUTPUT}"
+        else
+          timed_purge > "${expansion_dir}/expansion.log" 2>&1 &
+          echo "📈 Background purge started. The free space of the APFS container grows as the purge deletes."
+        fi
     - name: The Post
-      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
+      if: steps.environment-check.outputs.is_supported == 'true'
       # v3
       uses: srz-zumix/post-run-action@42756f7452b9439d0365b7e087b2c364f54209c6
       with:
@@ -781,19 +1040,6 @@ runs:
         post-run: |
           expansion_dir="${HOME}/.expansion"
           protocol=$(cat "${expansion_dir}/protocol" 2>/dev/null || echo "unknown")
-          runner_desc="$(lsb_release -ds 2>/dev/null || echo "${RUNNER_OS}") $(uname -m)"
-          nix_size="n/a"
-          nix_avail="n/a"
-          if findmnt -n --mountpoint /nix > /dev/null &&
-            read -r nix_size_bytes nix_avail_bytes < <(df -B1 --output=size,avail /nix | tail -n +2); then
-            nix_size=$(awk -v b="${nix_size_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
-            nix_avail=$(awk -v b="${nix_avail_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
-          fi
-          root_free="n/a"
-          root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ' || true)
-          if [[ "${root_free_bytes}" =~ ^[0-9]+$ ]]; then
-            root_free=$(awk -v b="${root_free_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
-          fi
           purge_seconds=$(cat "${expansion_dir}/purge_seconds" 2>/dev/null || echo "n/a")
           if [[ -e "${expansion_dir}/all_done" ]]; then
             purge_finished="yes"
@@ -802,33 +1048,77 @@ runs:
           else
             purge_finished="no, still running"
           fi
-          echo "Protocol: ${protocol}, runner: ${runner_desc}, /nix size: ${nix_size}, /nix available: ${nix_avail}, / free: ${root_free}, purge seconds: ${purge_seconds}, purge finished: ${purge_finished}"
-          if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-            {
-              echo "| Protocol | Runner | /nix size | /nix available | / free | Purge seconds | Purge finished |"
-              echo "| --- | --- | --- | --- | --- | --- | --- |"
-              echo "| ${protocol} | ${runner_desc} | ${nix_size} | ${nix_avail} | ${root_free} | ${purge_seconds} | ${purge_finished} |"
-            } >> "${GITHUB_STEP_SUMMARY}"
+          if [[ "${RUNNER_OS}" == "macOS" ]]; then
+            shortfall="some of the space is not free yet"
+            runner_desc="macOS $(sw_vers -productVersion 2>/dev/null || echo "unknown") $(uname -m)"
+            data_before="n/a"
+            data_before_bytes=$(cat "${expansion_dir}/data_free_before_bytes" 2>/dev/null || true)
+            if [[ "${data_before_bytes}" =~ ^[0-9]+$ ]]; then
+              data_before=$(awk -v b="${data_before_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+            fi
+            data_after="n/a"
+            data_after_kib=$(df -k /System/Volumes/Data | awk 'NR == 2 { print $4 }' || true)
+            if [[ "${data_after_kib}" =~ ^[0-9]+$ ]]; then
+              data_after=$(awk -v k="${data_after_kib}" 'BEGIN { printf "%.1f GiB", k / 1048576 }')
+            fi
+            echo "Protocol: ${protocol}, runner: ${runner_desc}, Data free before: ${data_before}, Data free after: ${data_after}, purge seconds: ${purge_seconds}, purge finished: ${purge_finished}"
+            if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+              {
+                echo "| Protocol | Runner | Data free before | Data free after | Purge seconds | Purge finished |"
+                echo "| --- | --- | --- | --- | --- | --- |"
+                echo "| ${protocol} | ${runner_desc} | ${data_before} | ${data_after} | ${purge_seconds} | ${purge_finished} |"
+              } >> "${GITHUB_STEP_SUMMARY}"
+            fi
           fi
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            shortfall="/nix did not get all of the freed space"
+            runner_desc="$(lsb_release -ds 2>/dev/null || echo "${RUNNER_OS}") $(uname -m)"
+            nix_size="n/a"
+            nix_avail="n/a"
+            if findmnt -n --mountpoint /nix > /dev/null &&
+              read -r nix_size_bytes nix_avail_bytes < <(df -B1 --output=size,avail /nix | tail -n +2); then
+              nix_size=$(awk -v b="${nix_size_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+              nix_avail=$(awk -v b="${nix_avail_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+            fi
+            root_free="n/a"
+            root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ' || true)
+            if [[ "${root_free_bytes}" =~ ^[0-9]+$ ]]; then
+              root_free=$(awk -v b="${root_free_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+            fi
+            echo "Protocol: ${protocol}, runner: ${runner_desc}, /nix size: ${nix_size}, /nix available: ${nix_avail}, / free: ${root_free}, purge seconds: ${purge_seconds}, purge finished: ${purge_finished}"
+            if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+              {
+                echo "| Protocol | Runner | /nix size | /nix available | / free | Purge seconds | Purge finished |"
+                echo "| --- | --- | --- | --- | --- | --- | --- |"
+                echo "| ${protocol} | ${runner_desc} | ${nix_size} | ${nix_avail} | ${root_free} | ${purge_seconds} | ${purge_finished} |"
+              } >> "${GITHUB_STEP_SUMMARY}"
+            fi
 
-          # The workspace, caches, and toolchains still write to /, and
-          # the root safe haven is all that the purge leaves there.
-          if [[ "${root_free_bytes}" =~ ^[0-9]+$ && "${root_free_bytes}" -lt 1073741824 ]]; then
-            echo "::warning::/ has less than 1 GiB free at the end of the job (${root_free_bytes} bytes). Raise root-safe-haven to keep more space on /."
+            # The workspace, caches, and toolchains still write to /, and
+            # the root safe haven is all that the purge leaves there.
+            if [[ "${root_free_bytes}" =~ ^[0-9]+$ && "${root_free_bytes}" -lt 1073741824 ]]; then
+              echo "::warning::/ has less than 1 GiB free at the end of the job (${root_free_bytes} bytes). Raise root-safe-haven to keep more space on /."
+            fi
           fi
 
           # The protocol file exists only when the purge started.
           if [[ -e "${expansion_dir}/protocol" && "${purge_finished}" != "yes" ]]; then
             if [[ "${purge_finished}" == "no, failed" ]]; then
-              echo "::warning::The ${protocol} purge failed, so /nix did not get all of the freed space. See the end of expansion.log below."
+              echo "::warning::The ${protocol} purge failed, so ${shortfall}. See the end of expansion.log below."
             else
-              echo "::warning::The ${protocol} purge did not finish before the job ended, so /nix did not get all of the freed space. See the end of expansion.log below."
+              echo "::warning::The ${protocol} purge did not finish before the job ended, so ${shortfall}. See the end of expansion.log below."
             fi
             echo "Last 50 lines of ${expansion_dir}/expansion.log:"
             tail -n 50 "${expansion_dir}/expansion.log" 2>/dev/null || echo "expansion.log not found"
           fi
 
           ls -ltr "${expansion_dir}"/*_done || true
+
+          # The rest reports the disk images and the Btrfs pool of /nix,
+          # which exist on Linux only.
+          if [[ "${RUNNER_OS}" != "Linux" ]]; then
+            exit 0
+          fi
           all_disks=()
 
           # Check for disks in /mnt directory
