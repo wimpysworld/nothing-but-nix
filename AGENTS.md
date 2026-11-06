@@ -113,6 +113,7 @@ The `test.yaml` workflow validates:
 - Ubuntu 22.04, 24.04 and 26.04 on x64 with all three installers
 - Ubuntu 24.04 and 26.04 on arm64 with `DeterminateSystems/determinate-nix-action` for every protocol, and with `cachix/install-nix-action` for holster only, with `nix-permission-edict` true and false. The cachix jobs test the multi-user installer, which runs `chown -R root:nixbld /nix` (#57). One protocol keeps the matrix small.
 - `btrfs-compression: zstd:-1` in the `determinate-nix-action` job for holster on `ubuntu-26.04`. One `include` entry adds the value to that existing job, and a step checks that `/nix` has the `compress=zstd:-1` mount option.
+- The compression ratio in the `determinate-nix-action` job. After the Nix build, a step builds `compsize` from nixpkgs, runs it with `sudo` on `/nix`, prints the report, and writes the disk usage and the uncompressed size to the job summary. When `compsize` cannot run, the step prints a `::warning::` and the job continues. The store holds only the test packages at that point, so the ratio is for a small store.
 - Three popular Nix installers:
   - DeterminateSystems/determinate-nix-action
   - nixbuild/nix-quick-install-action (requires `nix-permission-edict: true`)
