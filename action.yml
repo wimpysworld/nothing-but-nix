@@ -205,10 +205,17 @@ runs:
         # TMPDIR must stay outside /nix. The Nix multi-user installer runs
         # `chown -R root:nixbld /nix`, which locks the installer out of its own
         # temporary files under TMPDIR (#24, #57). The @tmp subvolume keeps
-        # temporary files on the compressed Btrfs pool.
+        # temporary files on the compressed Btrfs pool. The guard below fails
+        # the step when TMPDIR resolves under /nix.
         TMPNIX="$(sudo mktemp --directory --tmpdir=/var/tmp/nothing-but-nix)"
         sudo chmod 1777 "${TMPNIX}"
         echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
+        case "$(realpath "${TMPNIX}")" in
+          /nix|/nix/*)
+            echo "::error::TMPDIR (${TMPNIX}) must stay outside /nix because the Nix multi-user installer runs chown -R root:nixbld /nix (#57)"
+            exit 1
+            ;;
+        esac
 
         # Create a directory to store expansion state
         mkdir -p "${HOME}/.expansion"
