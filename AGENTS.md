@@ -123,7 +123,7 @@ Each floor is about 10% under the lowest available space observed on public runn
 
 The `ubuntu-slim` job runs the action on `ubuntu-slim`, an unprivileged container runner with no loop devices and no mount support. It checks that the action skips, that the outputs are empty, and that `/nix` is not a Btrfs mount. The `👁️ Sentinel` job needs this job too.
 
-The `background-purge` job runs the action with `witness-carnage: false` for cleave and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check. The `👁️ Sentinel` job needs this job too.
+The `background-purge` job runs the action with `witness-carnage: false` for carve, cleave, and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check with the floor for the protocol of the job. The `👁️ Sentinel` job needs this job too.
 
 ### Verification Commands
 
