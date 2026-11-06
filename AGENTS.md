@@ -156,7 +156,7 @@ Safe havens prevent filesystem exhaustion:
 - `mnt-safe-haven`: Space reserved on `/mnt` (default: 1024MB)
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved during initial volume creation and expansion
 
-Expansion disk is only created if `free_space > (root_safe_haven + 2048)`.
+An expansion disk is only created if `free_space > (root_safe_haven + 2048)`. The purge can call `add_expansion_disk` more than once, and each call that finds enough space adds one disk image.
 
 ## Security Considerations
 
@@ -170,12 +170,20 @@ Expansion disk is only created if `free_space > (root_safe_haven + 2048)`.
 
 ### Dynamic Volume Expansion
 
-The `/nix` volume grows in two phases:
+The `/nix` volume grows in up to three phases:
 
 1. **Initial volume** (1-10 seconds): Created from `/mnt` free space, provides ~65GB immediately
-2. **Expansion disk** (30-180 seconds): Added from `/` after purging, grows volume to 85-130GB
+2. **First expansion disk**: Added from `/` after the purge deletes the large trees that dpkg does not own
+3. **Second expansion disk**: Added from `/` after the Docker, apt, and remaining `rmz` work
 
-Expansion occurs via:
+For cleave and rampage, the purge runs in this order:
+
+1. `fast_trees` lists the large trees for the protocol, and `unowned_paths` keeps only the paths that no dpkg package owns (`dpkg-query --search`). `rmz_parallel` deletes them, one `rmz` per path in parallel.
+2. `add_expansion_disk` grows `/nix`.
+3. Docker, snap, and apt work, then the Cleave and Rampage `rmz` lists. These lists still name the fast trees, and `rmz -f` ignores the paths that are already gone.
+4. `add_expansion_disk` grows `/nix` again.
+
+`add_expansion_disk` sizes each disk image as the current free space of `/` less the safe haven, and does nothing when the free space is not more than the safe haven plus 2048 MB. Expansion occurs via:
 ```bash
 sudo btrfs device add --nodiscard ${loop_dev} /nix
 ```
