@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1'
+    # Thursday, after runner-images publishes new images early in the week
+    - cron: '0 6 * * 4'
   workflow_dispatch:
 
 concurrency:
