@@ -346,6 +346,8 @@ runs:
         # expressions, and the packages that nothing needs any more, in one
         # apt-get call. apt-get fails on a name that matches no package, and
         # set -e then stops the purge, so pass only installed packages.
+        # The classic solver also removes the packages that depend on the
+        # removed ones. The apt 3 solver keeps them, fails, and times out.
         function remove_packages() {
           local packages=()
           mapfile -t packages < <(installed_packages "$@")
@@ -355,7 +357,8 @@ runs:
             return 0
           fi
           echo "Removing ${#packages[@]} packages"
-          apt_get remove --purge --autoremove "${packages[@]}"
+          apt_get -o APT::Solver=internal \
+            remove --purge --autoremove "${packages[@]}"
         }
 
         # Restore update-initramfs.conf when the purge exits.
