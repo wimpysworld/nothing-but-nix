@@ -92,7 +92,7 @@ On x64 runners this bloat hogs over 40GiB of disk that your Nix store could use 
    - Documentation? Vaporized ️👻
 
 The file system purge is powered by `rmz` (from the [Fast Unix Commands (FUC)](https://github.com/SUPERCILEX/fuc) project) - a high-performance alternative to `rm` that makes space reclamation blazing fast! ⚡
-   - Outperforms standard `rm` by an order of magnitude
+   - In the [fuc remove benchmarks](https://github.com/SUPERCILEX/fuc/tree/master/comparisons#remove), `rmz` deletes trees of 10 to 1 million files up to 4 times as fast as `rm -r`, and about as fast in a flat directory
    - Parallel-processes deletions for maximum efficiency
    - **Carve reclaims its space in 14-82 seconds!** ️⏱️
 
