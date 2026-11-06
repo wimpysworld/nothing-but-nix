@@ -26,6 +26,8 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 ├── README.md               # User-facing documentation
 ├── LICENSE                 # MIT licence
 └── .github/
+    ├── actionlint.yaml     # Runner labels that actionlint does not know yet
+    ├── scripts/            # Checks that the test jobs run after the action
     └── workflows/
         ├── test.yaml       # Integration tests with multiple Nix installers (Ubuntu)
         ├── test-macos.yaml # macOS guard rail validation tests
@@ -90,7 +92,8 @@ gh run list --workflow=test.yaml --limit 5
 
 The `test.yaml` workflow validates:
 - All four hatchet protocols (holster, carve, cleave, rampage)
-- Ubuntu 22.04, 24.04 and 26.04 on x64, and Ubuntu 24.04 and 26.04 on arm64
+- Ubuntu 22.04, 24.04 and 26.04 on x64 with all three installers
+- Ubuntu 24.04 and 26.04 on arm64 with `DeterminateSystems/determinate-nix-action` only, to keep the matrix small
 - Three popular Nix installers:
   - DeterminateSystems/determinate-nix-action
   - nixbuild/nix-quick-install-action (requires `nix-permission-edict: true`)
