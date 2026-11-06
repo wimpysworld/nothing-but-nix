@@ -189,7 +189,7 @@ An expansion disk is only created if `free_space > (root_safe_haven + 2048)`. Th
 ## Security Considerations
 
 - **Privileged operations**: The action uses `sudo` extensively (requires runner permissions)
-- **Binary download**: The Setup downloads `rmz` 3.0.1 from GitHub releases with HTTPS and checks its SHA-256 before use. A mismatch fails the step with `::error::`. To move to a new release, change `RMZ_VERSION` and both `RMZ_SHA256` values together. Take each checksum from a `sha256sum` of the release asset, because GitHub publishes no digest for the 3.0.1 assets.
+- **Binary download**: The Setup downloads `rmz` 3.2.1 from GitHub releases with HTTPS and checks its SHA-256 before use. A mismatch fails the step with `::error::`. To move to a new release, change `RMZ_VERSION` and both `RMZ_SHA256` values together. Take each checksum from a `sha256sum` of the downloaded `x86_64-unknown-linux-gnu-rmz` and `aarch64-unknown-linux-gnu-rmz` assets, and compare it with the digest that `gh release view <tag> --repo SUPERCILEX/fuc --json assets` shows. Do not run the downloaded binaries to check them.
 - **No secret handling**: The action does not interact with secrets or credentials
 - **Destructive operations**: Purging is irreversible; protocol selection is critical
 - **Loop device management**: Uses `losetup --find` to avoid conflicts
