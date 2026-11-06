@@ -48,11 +48,20 @@ The action follows a specific execution order:
 
 1. **The Checks**: Validate environment (Ubuntu on Linux, macOS/Windows graceful skip, GitHub Actions, no pre-existing `/nix`)
 2. **The Hatchet Protocol**: Set purge level (0-3)
-3. **The Setup**: Download and install `rmz` binary (protocol level ≥2)
-4. **The Volume**: Create initial BTRFS volume from `/mnt` free space
-5. **The Local**: Purge `/usr/local` early (protocol level ≥2)
-6. **The Purge**: Execute background expansion script
-7. **The Post**: Report final disk usage and expansion status
+3. **The Survey**: Record free bytes on `/` before any purge
+4. **The Setup**: Download and install `rmz` binary (protocol level ≥2)
+5. **The Volume**: Create initial BTRFS volume from `/mnt` free space
+6. **The Local**: Purge `/usr/local` early (protocol level ≥2)
+7. **The Purge**: Execute background expansion script and time it
+8. **The Post**: Report final disk usage and expansion status, and write one row to the job summary
+
+### Outputs
+
+- `root-free-bytes`: free bytes on `/` before the purge
+- `nix-size-bytes` and `nix-avail-bytes`: size and available bytes of `/nix` when the action finishes. In background mode the purge can grow `/nix` after that.
+- `purge-seconds`: duration of the purge. It is empty in background mode, because the purge is still running when the action finishes.
+
+The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`.
 
 ### Naming Conventions
 

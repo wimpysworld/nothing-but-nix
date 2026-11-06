@@ -24,6 +24,19 @@ inputs:
     description: 'Grant user ownership of /nix directory (default: false). Useful for Nix installers that require user-writable /nix.'
     required: false
     default: 'false'
+outputs:
+  root-free-bytes:
+    description: 'Free bytes on the / filesystem before the action purges anything'
+    value: ${{ steps.survey.outputs.root-free-bytes }}
+  nix-size-bytes:
+    description: 'Size in bytes of /nix when the action finishes. In background mode the purge can grow /nix later.'
+    value: ${{ steps.purge.outputs.nix-size-bytes }}
+  nix-avail-bytes:
+    description: 'Available bytes on /nix when the action finishes. In background mode the purge can grow /nix later.'
+    value: ${{ steps.purge.outputs.nix-avail-bytes }}
+  purge-seconds:
+    description: 'Duration of the purge in seconds. Empty in background mode, where the post step reports it.'
+    value: ${{ steps.purge.outputs.purge-seconds }}
 runs:
   using: composite
   steps:
@@ -87,22 +100,36 @@ runs:
         case "$input_protocol" in
           "holster")
             echo "🪓 Hatchet Protocol: Holster - Keep the hatchet sheathed, use space from /mnt (Level 0)"
+            protocol_name="holster"
             protocol_level=0;;
           "carve")
             echo "🪓 Hatchet Protocol: Carve - Craft and combine free space from / and /mnt (Level 1)"
+            protocol_name="carve"
             protocol_level=1;;
           "cleave")
             echo "🪓 Hatchet Protocol: Cleave - Make powerful, decisive cuts to large packages (Level 2)"
+            protocol_name="cleave"
             protocol_level=2;;
           "rampage")
             echo "🪓 Hatchet Protocol: Rampage - Relentless, brutal elimination of all bloat (Level 3)"
+            protocol_name="rampage"
             protocol_level=3;;
           *)
             echo "🪓 Hatchet Protocol: Cleave - Make powerful, decisive cuts to large packages (Level 2)"
+            protocol_name="cleave"
             protocol_level=2;;
         esac
 
         echo "level=${protocol_level}" >> $GITHUB_OUTPUT
+        echo "name=${protocol_name}" >> "${GITHUB_OUTPUT}"
+    - name: The Survey
+      id: survey
+      if: steps.environment-check.outputs.is_supported == 'true'
+      shell: bash
+      run: |
+        root_free_bytes=$(df -B1 --output=avail / | tail -n 1 | tr -d ' ')
+        echo "Free space of / before the purge: ${root_free_bytes} bytes"
+        echo "root-free-bytes=${root_free_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Setup
       if: steps.environment-check.outputs.is_supported == 'true' && steps.set-hatchet-protocol.outputs.level > 1
       shell: bash
@@ -233,6 +260,7 @@ runs:
         sudo mv /usr/local /usr/local.purge
         sudo mkdir -p /usr/local/{bin,doc,include,lib,man,sbin,share,src} || true
     - name: The Purge
+      id: purge
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
       run: |
@@ -427,14 +455,35 @@ runs:
 
         # Make script executable
         chmod +x /tmp/expand_nix_volume.sh
+        echo "${{ steps.set-hatchet-protocol.outputs.name }}" > "${HOME}/.expansion/protocol"
+
+        # Time the purge. The post step reads purge_seconds, which appears
+        # when the purge exits, and all_done, which appears only on success.
+        function timed_purge() {
+          local purge_start
+          local purge_status=0
+          purge_start=$(date +%s)
+          /tmp/expand_nix_volume.sh || purge_status=$?
+          echo "$(( $(date +%s) - purge_start ))" > "${HOME}/.expansion/purge_seconds"
+          return "${purge_status}"
+        }
+
         # Execute based on witness-carnage setting
         if [ "${{ inputs.witness-carnage }}" == "true" ]; then
           echo "😮 Displaying the carnage in real-time. This will block until completion."
-          /tmp/expand_nix_volume.sh | tee ${HOME}/.expansion/expansion.log
+          timed_purge | tee "${HOME}/.expansion/expansion.log"
+          purge_seconds=$(cat "${HOME}/.expansion/purge_seconds")
+          echo "⏱️  The purge took ${purge_seconds} seconds"
+          echo "purge-seconds=${purge_seconds}" >> "${GITHUB_OUTPUT}"
         else
-          /tmp/expand_nix_volume.sh > ${HOME}/.expansion/expansion.log 2>&1 &
+          timed_purge > "${HOME}/.expansion/expansion.log" 2>&1 &
           echo "📈 Background space expansion started. /nix will grow as space becomes available."
         fi
+
+        read -r nix_size_bytes nix_avail_bytes < <(df -B1 --output=size,avail /nix | tail -n 1)
+        echo "Size of /nix: ${nix_size_bytes} bytes, available: ${nix_avail_bytes} bytes"
+        echo "nix-size-bytes=${nix_size_bytes}" >> "${GITHUB_OUTPUT}"
+        echo "nix-avail-bytes=${nix_avail_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Post
       if: runner.os == 'Linux'
       # v3
@@ -442,7 +491,34 @@ runs:
       with:
         shell: bash -e {0}
         post-run: |
-          ls -ltr ${HOME}/.expansion/*_done || true
+          expansion_dir="${HOME}/.expansion"
+          protocol=$(cat "${expansion_dir}/protocol" 2>/dev/null || echo "unknown")
+          runner_desc="$(lsb_release -ds 2>/dev/null || echo "${RUNNER_OS}") $(uname -m)"
+          nix_size="n/a"
+          nix_avail="n/a"
+          if findmnt -n --mountpoint /nix > /dev/null &&
+            read -r nix_size_bytes nix_avail_bytes < <(df -B1 --output=size,avail /nix | tail -n +2); then
+            nix_size=$(awk -v b="${nix_size_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+            nix_avail=$(awk -v b="${nix_avail_bytes}" 'BEGIN { printf "%.1f GiB", b / 1073741824 }')
+          fi
+          purge_seconds=$(cat "${expansion_dir}/purge_seconds" 2>/dev/null || echo "n/a")
+          if [[ -e "${expansion_dir}/all_done" ]]; then
+            purge_finished="yes"
+          elif [[ -e "${expansion_dir}/purge_seconds" ]]; then
+            purge_finished="no, failed"
+          else
+            purge_finished="no, still running"
+          fi
+          echo "Protocol: ${protocol}, runner: ${runner_desc}, /nix size: ${nix_size}, /nix available: ${nix_avail}, purge seconds: ${purge_seconds}, purge finished: ${purge_finished}"
+          if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+            {
+              echo "| Protocol | Runner | /nix size | /nix available | Purge seconds | Purge finished |"
+              echo "| --- | --- | --- | --- | --- | --- |"
+              echo "| ${protocol} | ${runner_desc} | ${nix_size} | ${nix_avail} | ${purge_seconds} | ${purge_finished} |"
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+          ls -ltr "${expansion_dir}"/*_done || true
           all_disks=()
 
           # Check for disks in /mnt directory
