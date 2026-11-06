@@ -3,10 +3,10 @@
 #
 # Usage: check-nix-volume.sh <protocol> [min-avail-gib]
 #
-# Without min-avail-gib, the floor comes from the protocol. The floors are
-# about 10% under the space observed on public x64 runners. Space on arm64
-# runners is not yet known, so arm64 uses the holster floor for every
-# protocol. Review the floors after the first green run on each image.
+# Without min-avail-gib, the floor comes from the protocol and the
+# architecture. Each floor is about 10% under the lowest available space
+# observed on public runners in November 2026. Review the floors when a
+# runner image changes.
 set -euo pipefail
 
 nix_volume="${NIX_VOLUME:-/nix}"
@@ -17,20 +17,26 @@ if [[ $# -lt 1 || $# -gt 2 ]]; then
 fi
 
 protocol="$(tr '[:upper:]' '[:lower:]' <<< "$1")"
-case "${protocol}" in
-  holster | carve) floor_gib=75 ;;
-  cleave) floor_gib=104 ;;
-  rampage) floor_gib=114 ;;
-  *)
-    echo "::error::Unknown protocol: ${protocol}"
-    exit 1
-    ;;
-esac
-
 arch="$(uname -m)"
+floor_gib=""
 if [[ "${arch}" == "aarch64" || "${arch}" == "arm64" ]]; then
-  echo "ℹ️  arm64 runner: the ${protocol} floor is not yet known, so the holster floor applies"
-  floor_gib=75
+  case "${protocol}" in
+    holster) floor_gib=94 ;;
+    carve) floor_gib=106 ;;
+    cleave) floor_gib=113 ;;
+    rampage) floor_gib=119 ;;
+  esac
+else
+  case "${protocol}" in
+    holster) floor_gib=75 ;;
+    carve) floor_gib=97 ;;
+    cleave) floor_gib=106 ;;
+    rampage) floor_gib=114 ;;
+  esac
+fi
+if [[ -z "${floor_gib}" ]]; then
+  echo "::error::Unknown protocol: ${protocol}"
+  exit 1
 fi
 
 if [[ $# -eq 2 ]]; then
