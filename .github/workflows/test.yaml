@@ -234,10 +234,53 @@ jobs:
             exit 1
           fi
           echo "The action skipped on ubuntu-slim and the workflow continues"
+  unsupported-os:
+    name: unsupported runner on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+      fail-fast: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        id: purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: cleave
+      - name: Check that the workflow continues
+        shell: bash
+        env:
+          NIX_SIZE_BYTES: ${{ steps.purge.outputs.nix-size-bytes }}
+          ROOT_FREE_BYTES: ${{ steps.purge.outputs.root-free-bytes }}
+        run: |
+          if [[ -n "${NIX_SIZE_BYTES}" || -n "${ROOT_FREE_BYTES}" ]]; then
+            echo "::error::The action did not skip on ${RUNNER_OS}, because its outputs are not empty"
+            exit 1
+          fi
+          # Nix is not installed yet, so /nix exists only if the action ran
+          if [[ -e /nix ]]; then
+            echo "::error::/nix exists on ${RUNNER_OS} before Nix is installed, so the action did not skip"
+            exit 1
+          fi
+          echo "The action skipped on ${RUNNER_OS} and the workflow continues"
+      - uses: DeterminateSystems/determinate-nix-action@main
+        if: runner.os == 'macOS'
+      - name: Nix
+        if: runner.os == 'macOS'
+        run: |
+          nix --version
+          echo "Hello from macOS" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
   sentinel:
     name: "👁️ Sentinel"
     if: always()
-    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, ubuntu-slim]
+    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, ubuntu-slim, unsupported-os]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
