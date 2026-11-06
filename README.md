@@ -33,8 +33,8 @@
 
 **Transform your GitHub Actions runner into a [Nix](https://zero-to-nix.com/concepts/nix/) ❄️ powerhouse by ruthlessly slashing pre-installed bloat.**
 
-GitHub Actions runners come with meager disk space for Nix - a mere ~20GB.
-*Nothing but Nix* **brutally purges** unnecessary software, giving you **85GiB to 128GiB** for your Nix store! 💪
+GitHub Actions runners come with about 86-88GiB free on `/` (x64) and a disk stuffed with tools that Nix never uses.
+*Nothing but Nix* **brutally purges** unnecessary software and pools the space into a compressed Btrfs `/nix`, giving you **about 83GiB to 133GiB** for your Nix store! 💪
 
 ## Usage 🔧
 
@@ -76,14 +76,14 @@ Standard GitHub Actions runners are stuffed with *"bloatware"* you'll never use 
 - 📦 Package managers gathering digital dust
 - 📚 Documentation no one will ever read
 
-This bloat leaves only ~20GB for your Nix store - barely enough for serious Nix builds! 😞
+On x64 runners this bloat hogs over 40GiB of disk that your Nix store could use instead! 😞
 
 ## The Solution: Nothing but Nix ️❄️
 
 **Nothing but Nix** takes a scorched-earth approach to GitHub Actions runners and mercilessly reclaims disk space using a two-phase attack:
 
-1. **Initial Slash:** Instantly creates a large `/nix` volume (~85GiB) by claiming free space from `/mnt`
-2. **Background Rampage:** While your workflow continues, we ruthlessly eliminate unnecessary software to expand your `/nix` volume up to ~128GiB
+1. **Initial Slash:** Instantly creates a large `/nix` volume (about 83-86GiB on x64, 104GiB on arm64) by claiming the free space of the runner disk through `/mnt`
+2. **Background Rampage:** While your workflow continues, we ruthlessly eliminate unnecessary software to expand your `/nix` volume up to about 133GiB
    - Web browsers? Nope ⛔
    - Docker images? Gone 🗑️
    - Language runtimes? Obliterated 💥
@@ -93,21 +93,21 @@ This bloat leaves only ~20GB for your Nix store - barely enough for serious Nix 
 The file system purge is powered by `rmz` (from the [Fast Unix Commands (FUC)](https://github.com/SUPERCILEX/fuc) project) - a high-performance alternative to `rm` that makes space reclamation blazing fast! ⚡
    - Outperforms standard `rm` by an order of magnitude
    - Parallel-processes deletions for maximum efficiency
-   - **Reclaims disk space in seconds rather than minutes!** ️⏱️
+   - **Carve reclaims its space in 14-82 seconds!** ️⏱️
 
-The end result? A GitHub Actions runner with **85GiB to 128GiB** of Nix-ready space! 😁
+The end result? A GitHub Actions runner with **about 83GiB to 133GiB** of Nix-ready space! 😁
 
 ### Dynamic Volume Growth
 
 Unlike other solutions, **Nothing but Nix** grows your `/nix` volume dynamically:
 
-1. **Initial Volume Creation (1-10 seconds):** (*depending on Hatchet Protocol*)
+1. **Initial Volume Creation (1-3 seconds):**
    - Creates a loop device from free space on `/mnt`
    - Sets up a BTRFS filesystem with single data and metadata profiles
    - Mounts with compression and performance tuning
-   - Provides a ~85GiB `/nix` immediately, even before the purge begins
+   - Provides about 83-86GiB of `/nix` on x64 (104GiB on arm64) immediately, even before the purge begins
 
-2. **Background Expansion (30-180 seconds):** (*depending on Hatchet Protocol*)
+2. **Background Expansion:** (*14-82 seconds for Carve, 36-108 for Cleave, 111-235 for Rampage*)
    - Executes purging operations
    - Monitors for newly freed space as bloat is eliminated
    - Dynamically adds an expansion disk to the `/nix` volume
@@ -127,12 +127,12 @@ Control the level of annihilation 💥 with the `hatchet-protocol` input:
 
 #### Protocol Comparison ⚖️
 
-| Protocol | `/nix`       | Description                                          | Purge apt  | Purge docker | Purge snap | Purged file systems                                   |
-|----------|--------------|------------------------------------------------------|------------|--------------|------------|-------------------------------------------------------|
-| Holster  | ~85GiB       | Keep the hatchet sheathed, use space from `/mnt`     | No         | No           | No         | None                                                  |
-| Carve    | Not measured | Fast cuts to large toolchains that dpkg does not own | No         | No           | No         | Toolchains in `/opt`, `/usr/local`, `/usr/share`, `~` |
-| Cleave   | ~116GiB      | Make powerful, decisive cuts to large packages       | Minimal    | Yes          | Yes        | `/opt`, `/usr/local`, toolchains in `/usr/share`      |
-| Rampage  | ~128GiB      | Relentless, brutal elimination of all bloat          | Aggressive | Yes          | Yes        | Muahahaha! 🔥🌎                                        |
+| Protocol | `/nix` x64  | `/nix` arm64 | Description                                          | Purge apt  | Purge docker | Purge snap | Purged file systems                                   |
+|----------|-------------|--------------|------------------------------------------------------|------------|--------------|------------|-------------------------------------------------------|
+| Holster  | ~83-86GiB   | ~104GiB      | Keep the hatchet sheathed, use space from `/mnt`     | No         | No           | No         | None                                                  |
+| Carve    | ~108-115GiB | ~118GiB      | Fast cuts to large toolchains that dpkg does not own | No         | No           | No         | Toolchains in `/opt`, `/usr/local`, `/usr/share`, `~` |
+| Cleave   | ~118-126GiB | ~126GiB      | Make powerful, decisive cuts to large packages       | Minimal    | Yes          | Yes        | `/opt`, `/usr/local`, toolchains in `/usr/share`      |
+| Rampage  | ~127-133GiB | ~132-133GiB  | Relentless, brutal elimination of all bloat          | Aggressive | Yes          | Yes        | Muahahaha! 🔥🌎                                        |
 
 Choose wisely:
 - **Holster** when you need the runner's tools to remain fully functional
@@ -140,7 +140,7 @@ Choose wisely:
 - **Cleave** (*default*) for a good balance of space and functionality
 - **Rampage** when you need maximum Nix space and don't care what breaks `#nix-is-life`
 
-The `/nix` sizes are the available space observed on public x64 runners, and they change when GitHub updates the runner images. Private repositories get smaller disks, so expect less. Carve is not measured yet since it became the fast purge.
+The `/nix` sizes are the available space observed on public GitHub-hosted runners in November 2026, and they change when GitHub updates the runner images. Btrfs `zstd:1` compression lets the store hold more than these raw sizes. On x64, Cleave and Rampage add about 34-49GiB over Holster. Private repositories get smaller disks, so expect less.
 
 GitHub does not guarantee a separate `/mnt` disk. On current images `/` and `/mnt` share one disk, so Holster takes the free space of that disk through `/mnt`. On these single-disk runners, Carve gains its extra space from the fast purge, not from `/mnt`.
 
@@ -163,13 +163,13 @@ Control how much space to spare from the Nix store land grab with custom safe ha
 - uses: wimpysworld/nothing-but-nix@main
   with:
     ️hatchet-protocol: 'cleave'
-    root-safe-haven: '3072'   # Reserve 3GB on the / filesystem
-    mnt-safe-haven: '2048'    # Reserve 2GB on the /mnt filesystem
+    root-safe-haven: '3072'   # Reserve 3GiB on the / filesystem
+    mnt-safe-haven: '2048'    # Reserve 2GiB on the /mnt filesystem
 ```
 
 These safe havens define how much space (in MB) will be mercifully spared during space reclamation:
-- Default `root-safe-haven` is 2048MB (2GB)
-- Default `mnt-safe-haven` is 1024MB (1GB)
+- Default `root-safe-haven` is 2048MB (2GiB)
+- Default `mnt-safe-haven` is 1024MB (1GiB)
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved
 
 Increase these values if you need more breathing room on your filesystems, or decrease them to show no mercy! 😈
@@ -194,7 +194,7 @@ The `/nix` volume uses Btrfs `zstd:1` compression by default. Pick another with 
 | `zstd:6`           | 33%      | 93 MB/s           | Space matters far more than write speed                     |
 | `lzo`              | 46%      | 295 MB/s          | Never, `zstd:1` beats it on space and speed                 |
 
-The figures come from a sample of Nix store paths, compressed on one CPU thread in 128 KiB blocks. Real CI stores hold more data that is already compressed, so expect 40% to 60% disk use at `zstd:1`.
+The figures come from a 2.09 GB sample of Nix store paths, compressed on one CPU thread in 128 KiB blocks. Real CI stores hold more data that is already compressed, so expect 40% to 60% disk use at `zstd:1`.
 
 - Accepted values: `none`, `lzo`, `zlib`, `zlib:1` to `zlib:9`, `zstd`, `zstd:1` to `zstd:15`, and `zstd:-1` to `zstd:-15`. Any other value fails the step.
 - Negative `zstd` levels need Linux 6.15 or later. Older kernels, such as the 6.8 kernel on `ubuntu-22.04`, silently use level 3 instead, so the action uses `zstd:1` and prints a warning.
@@ -278,6 +278,6 @@ If your build runs out of space despite using Nothing but Nix, it's likely becau
     witness-carnage: true
 ```
 
-This adds 30-180 seconds to your workflow setup, but guarantees maximum space is available when your build begins.
+This adds about 2-4 minutes to your workflow setup with Rampage (about 40-110 seconds with Cleave, 17-85 seconds with Carve), but guarantees maximum space is available when your build begins.
 
 Now go and build something amazing with all that glorious Nix store space! ❄️
