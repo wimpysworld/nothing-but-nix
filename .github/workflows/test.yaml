@@ -258,12 +258,154 @@ jobs:
             exit 1
           fi
           echo "The action skipped on ubuntu-slim and the workflow continues"
+  # Apple silicon only. Few macOS runners run at once, so keep the matrix small.
+  macos:
+    name: ${{ matrix.installer }} (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        os: [macos-15, macos-26]
+        hatchet-protocol: [holster, carve, cleave, rampage]
+        installer: [determinate-nix-action]
+        include:
+          - os: macos-26
+            hatchet-protocol: holster
+            installer: cachix-nix-action
+          - os: macos-26
+            hatchet-protocol: rampage
+            installer: cachix-nix-action
+          - os: macos-26
+            hatchet-protocol: holster
+            installer: nix-quick-install
+          - os: macos-26
+            hatchet-protocol: rampage
+            installer: nix-quick-install
+      fail-fast: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        id: purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: ${{ matrix.hatchet-protocol }}
+          witness-carnage: true
+      - name: Check the runner
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+          ROOT_FREE_BYTES: ${{ steps.purge.outputs.root-free-bytes }}
+        run: bash ./.github/actions/this/.github/scripts/check-macos.sh "${HATCHET_PROTOCOL}" "${ROOT_FREE_BYTES}"
+      - uses: DeterminateSystems/determinate-nix-action@main
+        if: matrix.installer == 'determinate-nix-action'
+      - uses: cachix/install-nix-action@v31
+        if: matrix.installer == 'cachix-nix-action'
+      - uses: nixbuild/nix-quick-install-action@v35
+        if: matrix.installer == 'nix-quick-install'
+      - name: Nix
+        env:
+          HELLO: ${{ matrix.installer == 'determinate-nix-action' && 'https://flakehub.com/f/NixOS/nixpkgs/*#hello' || 'nixpkgs#hello' }}
+        run: |
+          nix --version
+          # Build a package to ensure the Nix store is functional
+          nix build "${HELLO}"
+  macos-background-purge:
+    name: background purge (rampage) on macos-26
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        id: purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: rampage
+          witness-carnage: false
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - name: Nix
+        run: |
+          nix --version
+          # Build a package whilst the purge runs in the background
+          nix build "https://flakehub.com/f/NixOS/nixpkgs/*#hello"
+      - name: Wait for the background purge
+        timeout-minutes: 11
+        run: |
+          expansion_dir="${HOME}/.expansion"
+          # The purge writes purge_seconds when it exits, after all_done on
+          # success. Check every 5 seconds for at most 10 minutes.
+          for _ in $(seq 1 120); do
+            if [[ -s "${expansion_dir}/purge_seconds" ]]; then
+              if [[ -e "${expansion_dir}/all_done" ]]; then
+                echo "The background purge finished in $(cat "${expansion_dir}/purge_seconds") seconds"
+                exit 0
+              fi
+              echo "::error::The background purge failed"
+              cat "${expansion_dir}/expansion.log"
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::The background purge did not finish within 10 minutes"
+          cat "${expansion_dir}/expansion.log"
+          exit 1
+      - name: Check the runner
+        env:
+          ROOT_FREE_BYTES: ${{ steps.purge.outputs.root-free-bytes }}
+        run: bash ./.github/actions/this/.github/scripts/check-macos.sh rampage "${ROOT_FREE_BYTES}"
+  # xcode-27 is the macOS 27 preview image until GitHub adds macos-27. It is
+  # a preview, so it is not in the needs of sentinel and never blocks a merge.
+  macos-preview:
+    name: determinate-nix-action (rampage) on ${{ matrix.os }} preview
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        os: [xcode-27]
+        hatchet-protocol: [rampage]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          path: ./.github/actions/this
+      - name: Purge
+        id: purge
+        uses: ./.github/actions/this
+        with:
+          hatchet-protocol: ${{ matrix.hatchet-protocol }}
+          witness-carnage: true
+      - name: Check the runner
+        env:
+          HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
+          ROOT_FREE_BYTES: ${{ steps.purge.outputs.root-free-bytes }}
+        run: bash ./.github/actions/this/.github/scripts/check-macos.sh "${HATCHET_PROTOCOL}" "${ROOT_FREE_BYTES}"
+      - uses: DeterminateSystems/determinate-nix-action@main
+      - name: Nix
+        run: |
+          nix --version
+          # Build a package to ensure the Nix store is functional
+          nix build "https://flakehub.com/f/NixOS/nixpkgs/*#hello"
   unsupported-os:
     name: unsupported runner on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        # Intel macOS skips, because Nixpkgs is deprecating x86_64-darwin
+        os: [macos-15-intel, windows-latest]
       fail-fast: false
     permissions:
       contents: read
@@ -534,7 +676,7 @@ jobs:
   sentinel:
     name: "👁️ Sentinel"
     if: always()
-    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, ubuntu-slim, unsupported-os, lint]
+    needs: [determinate-nix-action, nix-quick-install, cachix-nix-action, background-purge, macos, macos-background-purge, ubuntu-slim, unsupported-os, lint]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
