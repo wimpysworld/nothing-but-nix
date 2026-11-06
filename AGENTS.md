@@ -76,7 +76,7 @@ The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all
 The action cannot be tested locally as it requires GitHub Actions runners. Test using workflow dispatch:
 
 ```bash
-# Trigger test workflow (tests all protocols on ubuntu-22.04 and ubuntu-24.04)
+# Trigger test workflow (tests all protocols on the Ubuntu x64 and arm64 runners in the matrix)
 gh workflow run test.yaml
 
 # Trigger debug workflow (rampage protocol with large safe havens)
@@ -90,7 +90,7 @@ gh run list --workflow=test.yaml --limit 5
 
 The `test.yaml` workflow validates:
 - All four hatchet protocols (holster, carve, cleave, rampage)
-- Both Ubuntu LTS versions (22.04, 24.04)
+- Ubuntu 22.04, 24.04 and 26.04 on x64, and Ubuntu 24.04 and 26.04 on arm64
 - Three popular Nix installers:
   - DeterminateSystems/determinate-nix-action
   - nixbuild/nix-quick-install-action (requires `nix-permission-edict: true`)
@@ -196,7 +196,7 @@ Temporary files use the compressed BTRFS pool rather than the constrained `/` fi
 Before submitting changes:
 
 1. Test all four hatchet protocols via `test.yaml`
-2. Verify both Ubuntu LTS versions (22.04, 24.04)
+2. Verify every Ubuntu version and architecture in the `test.yaml` matrix
 3. Confirm README.md reflects any new inputs or behaviour changes
 4. Use British English in documentation
 5. Follow existing naming conventions for steps ("The X" pattern)
