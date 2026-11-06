@@ -171,15 +171,16 @@ By default, purging runs in the background (`witness-carnage: false`):
 
 ### TMPDIR Relocation
 
-The action sets `TMPDIR` inside `/nix/tmp` to prevent build failures:
+The BTRFS filesystem holds two subvolumes. The action mounts `@nix` at `/nix` and `@tmp` at `/var/tmp/nothing-but-nix`, then sets `TMPDIR` inside the `@tmp` mount:
 ```bash
-sudo mkdir -p /nix/tmp && sudo chmod 1777 /nix/tmp
-TMPNIX="$(sudo mktemp --directory --tmpdir=/nix/tmp)"
+TMPNIX="$(sudo mktemp --directory --tmpdir=/var/tmp/nothing-but-nix)"
 sudo chmod 1777 "${TMPNIX}"
 echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
 ```
 
-This ensures temporary files use the compressed BTRFS `/nix` pool rather than the constrained `/` filesystem or the unallocated `/mnt` safe haven.
+Temporary files use the compressed BTRFS pool rather than the constrained `/` filesystem or the unallocated `/mnt` safe haven.
+
+`TMPDIR` must stay outside `/nix`. The Nix multi-user installer runs `chown -R root:nixbld /nix`. When `TMPDIR` is under `/nix`, that command locks the installer out of its own temporary files and the install fails (#24, #57). Do not move `TMPDIR` into `/nix`.
 
 ## Contributing
 
