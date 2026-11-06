@@ -12,7 +12,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 ## Technology Stack
 
-- **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS and Windows runners gracefully skip)
+- **Platform**: GitHub Actions composite action (Ubuntu runners only; macOS, Windows, and container runners such as `ubuntu-slim` gracefully skip)
 - **Shell**: Bash (embedded in `action.yml`)
 - **Filesystem**: BTRFS with single profile (`-d single -m single`), `zstd:1` compression by default, loop devices
 - **Tools**: `rmz` (Fast Unix Commands), `systemctl`, APT, snap
@@ -48,7 +48,7 @@ The action is production-ready and intended for use in GitHub Actions workflows 
 
 The action follows a specific execution order:
 
-1. **The Checks**: Validate environment (Ubuntu on Linux, macOS/Windows graceful skip, GitHub Actions, no pre-existing `/nix`)
+1. **The Checks**: Validate environment (macOS/Windows graceful skip, loop device graceful skip, Ubuntu on Linux, GitHub Actions, no pre-existing `/nix`)
 2. **The Hatchet Protocol**: Set purge level (0-3)
 3. **The Survey**: Record free bytes on `/` before any purge
 4. **The Setup**: Download, check, and install the `rmz` binary (protocol level ≥1)
@@ -120,6 +120,8 @@ After the action, each job runs `.github/scripts/check-nix-volume.sh <protocol>`
 | rampage | 114 GiB | 119 GiB |
 
 Each floor is about 10% under the lowest available space observed on public runners in November 2026. When a runner image changes and a weekly run fails on a floor, review the floors in the script.
+
+The `ubuntu-slim` job runs the action on `ubuntu-slim`, an unprivileged container runner with no loop devices and no mount support. It checks that the action skips, that the outputs are empty, and that `/nix` is not a Btrfs mount. The `👁️ Sentinel` job needs this job too.
 
 The `background-purge` job runs the action with `witness-carnage: false` for cleave and rampage on `ubuntu-24.04` and `ubuntu-26.04`. It installs Nix with `DeterminateSystems/determinate-nix-action` and builds `hello` while the purge runs. Then it waits at most 10 minutes for the purge to finish and runs the volume check. The `👁️ Sentinel` job needs this job too.
 
@@ -247,6 +249,7 @@ Before submitting changes:
 - **Ubuntu only**: Action checks for Ubuntu via `lsb_release -is`
 - **macOS graceful skip**: Action detects macOS/Darwin runners and exits gracefully with a warning (workflow continues)
 - **Windows graceful skip**: Action detects Windows runners and exits gracefully with a warning (workflow continues)
+- **Loop device graceful skip**: On Linux, The Checks needs `/dev/loop-control` and a successful `sudo -n losetup --find`. When either fails, the action prints the reason, sets `is_supported=false`, and exits 0, like the macOS branch. Later steps, The Post included, then skip, and the outputs stay empty. This covers container runners such as `ubuntu-slim`
 - **Pre-Nix only**: Must run before Nix installation (checks for `/nix` directory)
 - **GitHub Actions only**: Requires `$GITHUB_ACTIONS` environment variable
 - **BTRFS required**: Ubuntu runners include BTRFS tools by default

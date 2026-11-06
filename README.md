@@ -65,6 +65,7 @@ jobs:
 - Must run **before** Nix is installed
 - **macOS/Darwin runners**: This action will gracefully skip with a warning if run on macOS. macOS runners already provide sufficient space for Nix and do not require this action
 - **Windows runners**: This action will gracefully skip with a warning if run on Windows. Windows runners have different filesystem layouts and constraints
+- **Container runners such as `ubuntu-slim`**: This action will gracefully skip with a warning when the runner has no loop devices. The action checks that `/dev/loop-control` exists and that `sudo -n losetup --find` succeeds. `ubuntu-slim` is an unprivileged container with no loop devices and no mount support, so a later Nix install uses the container disk as it is
 
 ## The Problem: Making Room for Nix to Thrive 🌱
 

@@ -66,6 +66,24 @@ runs:
           exit 0
         fi
 
+        # Check for loop device support - warn but don't fail. Container
+        # runners such as ubuntu-slim have no loop devices and cannot mount.
+        if [[ "${{ runner.os }}" == "Linux" ]]; then
+          loop_reason=""
+          if [[ ! -e /dev/loop-control ]]; then
+            loop_reason="/dev/loop-control does not exist"
+          elif ! sudo -n losetup --find > /dev/null 2>&1; then
+            loop_reason="sudo -n losetup --find failed"
+          fi
+          if [[ -n "${loop_reason}" ]]; then
+            echo "is_supported=false" >> "${GITHUB_OUTPUT}"
+            echo "⚠️  Nothing but Nix needs loop devices, and this runner cannot use them: ${loop_reason}."
+            echo "ℹ️  Container runners such as ubuntu-slim are not supported."
+            echo "ℹ️  This action will be skipped and your workflow will continue normally."
+            exit 0
+          fi
+        fi
+
         # Check for Ubuntu on Linux runners
         if [[ "${{ runner.os }}" == "Linux" ]]; then
           if [ "$(lsb_release -is)" != "Ubuntu" ]; then
@@ -717,7 +735,7 @@ runs:
         echo "nix-size-bytes=${nix_size_bytes}" >> "${GITHUB_OUTPUT}"
         echo "nix-avail-bytes=${nix_avail_bytes}" >> "${GITHUB_OUTPUT}"
     - name: The Post
-      if: runner.os == 'Linux'
+      if: runner.os == 'Linux' && steps.environment-check.outputs.is_supported == 'true'
       # v3
       uses: srz-zumix/post-run-action@42756f7452b9439d0365b7e087b2c364f54209c6
       with:
