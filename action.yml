@@ -13,7 +13,7 @@ inputs:
     required: false
     default: 'false'
   root-safe-haven:
-    description: 'Space in MB to mercifully spare on the / filesystem, or auto: 10240 for holster and carve, 6144 for cleave and rampage (default: auto)'
+    description: 'Space in MB to mercifully spare on the / filesystem, or auto: 10240 for holster and carve, 6144 for cleave and rampage, at most 25% of the free space of / and at least 2048 (default: auto)'
     required: false
     default: 'auto'
   mnt-safe-haven:
@@ -145,7 +145,9 @@ runs:
         esac
 
         # Resolve the root safe haven. Holster and carve keep Docker and the
-        # runner toolchains, so auto reserves more of / for them.
+        # runner toolchains, so auto reserves more of / for them. On small
+        # disks, auto takes at most 25% of the free space of /, but never
+        # less than 2048MB.
         root_safe_haven="$(tr '[:upper:]' '[:lower:]' <<< "${ROOT_SAFE_HAVEN}")"
         if [[ "${root_safe_haven}" == "auto" ]]; then
           if [[ "${protocol_level}" -le 1 ]]; then
@@ -153,7 +155,21 @@ runs:
           else
             root_safe_haven=6144
           fi
-          echo "🛡️  Root safe haven: auto, ${root_safe_haven}MB for ${protocol_name}"
+          root_free_mb=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
+          if [[ ! "${root_free_mb}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Could not read the free space of / to resolve root-safe-haven: auto"
+            exit 1
+          fi
+          root_cap_mb=$((root_free_mb / 4))
+          if [[ "${root_cap_mb}" -lt 2048 ]]; then
+            root_cap_mb=2048
+          fi
+          if [[ "${root_safe_haven}" -gt "${root_cap_mb}" ]]; then
+            echo "🛡️  Root safe haven: auto, ${root_cap_mb}MB for ${protocol_name}, capped from ${root_safe_haven}MB because / has only ${root_free_mb}MB free (25% of free space, at least 2048MB)"
+            root_safe_haven="${root_cap_mb}"
+          else
+            echo "🛡️  Root safe haven: auto, ${root_safe_haven}MB for ${protocol_name}"
+          fi
         elif [[ "${root_safe_haven}" =~ ^[1-9][0-9]*$ ]]; then
           echo "🛡️  Root safe haven: ${root_safe_haven}MB"
         else

@@ -170,6 +170,7 @@ Control how much space to spare from the Nix store land grab with custom safe ha
 
 These safe havens define how much space (in MB) will be mercifully spared during space reclamation:
 - Default `root-safe-haven` is `auto`: 10240MB (10GiB) for Holster and Carve, and 6144MB (6GiB) for Cleave and Rampage
+- On small disks, `auto` reserves at most 25% of the free space of `/` when the action starts, but never less than 2048MB. For example, a private runner with about 18GB free on `/` gets about 4.5GiB, not 10GiB, so `/nix` keeps most of the disk. The step log says when the cap applies
 - Default `mnt-safe-haven` is 1024MB (1GiB)
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved
 - `root-safe-haven` accepts `auto` or a positive whole number of MB. Any other value fails the step
