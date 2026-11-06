@@ -12,7 +12,7 @@ mcp:
   playwright: false
 
 repository:
-  description: "Create a 130GB Nix ️store in GitHub runners ❄️ Multi-partition BTRFS RAID-0 for /nix 💪 Brutally purges unnecessary software 🪓 Dynamically grows the Nix store 📈"
+  description: "Create a 130GB Nix ️store in GitHub runners ❄️ Multi-disk BTRFS pool for /nix 💪 Brutally purges unnecessary software 🪓 Dynamically grows the Nix store 📈"
   homepage: https://github.com/marketplace/actions/nothing-but-nix
   has_wiki: false
   has_discussions: false

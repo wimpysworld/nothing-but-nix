@@ -47,6 +47,8 @@
                 actionlint
                 gh
                 just
+                shellcheck
+                yq-go
               ]
               ++ (if tailorPkgs ? tailor then [ tailorPkgs.tailor ] else [ ])
               ++ import ./nix/loader.nix { inherit pkgs; };
