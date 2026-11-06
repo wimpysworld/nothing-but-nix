@@ -191,11 +191,22 @@ runs:
           exit 1
         fi
 
+        # Attach a disk image with direct I/O and 4096-byte sectors, so that
+        # its data is not cached twice, once for Btrfs and once for the image
+        # file. Attach it without them when losetup rejects either option.
+        function attach_image() {
+          if ! sudo losetup --direct-io=on --sector-size 4096 "$1" "$2"; then
+            echo "::warning::losetup rejected --direct-io=on --sector-size 4096 for $2, so $1 uses buffered I/O"
+            sudo losetup "$1" "$2"
+          fi
+        }
+
         loop_dev=$(sudo losetup --find)
         loop_num=${loop_dev##*/loop}
 
         if sudo fallocate -l $((free_space - effective_safe_haven))M "/mnt/disk${loop_num}.img"; then
-          sudo losetup ${loop_dev} "/mnt/disk${loop_num}.img"
+          attach_image "${loop_dev}" "/mnt/disk${loop_num}.img"
+          sudo losetup --list --output NAME,DIO,LOG-SEC "${loop_dev}"
         else
           echo "❌ Failed to allocate disk image on /mnt"
           exit 1
@@ -415,6 +426,16 @@ runs:
           fi
         }
 
+        # Attach a disk image with direct I/O and 4096-byte sectors, like the
+        # initial volume. Attach it without them when losetup rejects either
+        # option.
+        function attach_image() {
+          if ! sudo losetup --direct-io=on --sector-size 4096 "$1" "$2"; then
+            echo "::warning::losetup rejected --direct-io=on --sector-size 4096 for $2, so $1 uses buffered I/O"
+            sudo losetup "$1" "$2"
+          fi
+        }
+
         # Grow /nix with the free space of / less the safe haven. The purge
         # calls this after each phase that frees space. Each call that finds
         # enough space adds one more disk image to the /nix pool.
@@ -436,7 +457,7 @@ runs:
           loop_num=${loop_dev##*/loop}
           disk_image="/disk${loop_num}.img"
           if sudo fallocate -l "${disk_size}M" "${disk_image}"; then
-            sudo losetup "${loop_dev}" "${disk_image}"
+            attach_image "${loop_dev}" "${disk_image}"
 
             # Add the new device to the pool
             sudo btrfs device add --nodiscard "${loop_dev}" /nix
