@@ -210,9 +210,13 @@ runs:
         TMPNIX="$(sudo mktemp --directory --tmpdir=/var/tmp/nothing-but-nix)"
         sudo chmod 1777 "${TMPNIX}"
         echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
-        case "$(realpath "${TMPNIX}")" in
+        if ! tmpdir_real="$(realpath -e "${TMPNIX}")"; then
+          echo "::error::TMPDIR (${TMPNIX}) could not be resolved"
+          exit 1
+        fi
+        case "${tmpdir_real}" in
           /nix|/nix/*)
-            echo "::error::TMPDIR (${TMPNIX}) must stay outside /nix because the Nix multi-user installer runs chown -R root:nixbld /nix (#57)"
+            echo "::error::TMPDIR (${tmpdir_real}) must stay outside /nix because the Nix multi-user installer runs chown -R root:nixbld /nix (#57)"
             exit 1
             ;;
         esac
