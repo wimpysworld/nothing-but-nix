@@ -1,0 +1,298 @@
+# Initially fitted by tailor on 2026-11-06
+license: MIT
+
+languages:
+  go: false
+  rust: false
+  python: false
+
+# Model Context Protocol integrations are opt-in.
+mcp:
+  blender: false
+  playwright: false
+
+repository:
+  description: "Create a 130GB Nix ️store in GitHub runners ❄️ Multi-partition BTRFS RAID-0 for /nix 💪 Brutally purges unnecessary software 🪓 Dynamically grows the Nix store 📈"
+  homepage: https://github.com/marketplace/actions/nothing-but-nix
+  has_wiki: false
+  has_discussions: false
+  has_projects: false
+  has_issues: true
+  allow_merge_commit: false
+  allow_squash_merge: true
+  allow_rebase_merge: true
+  squash_merge_commit_title: PR_TITLE
+  squash_merge_commit_message: PR_BODY
+  delete_branch_on_merge: true
+  allow_update_branch: true
+  allow_auto_merge: true
+  web_commit_signoff_required: false
+  private_vulnerability_reporting_enabled: true
+  vulnerability_alerts_enabled: true
+  automated_security_fixes_enabled: true
+  default_workflow_permissions: read
+  can_approve_pull_request_reviews: false
+  secret_scanning: enabled
+  secret_scanning_push_protection: enabled
+  secret_scanning_non_provider_patterns: enabled
+
+immutable_releases:
+  enabled: false
+
+actions:
+  # Options: all, local_only, selected. SHA pinning applies separately.
+  # selected requires github_owned_allowed, verified_allowed, and patterns_allowed.
+  enabled: true
+  allowed_actions: all
+  sha_pinning_required: false
+  fork_pr_contributor_approval:
+    approval_policy: first_time_contributors
+
+code_scanning:
+  state: configured
+  query_suite: default
+  threat_model: remote
+  # An empty list means GitHub detects the languages. Valid values:
+  # actions, c-cpp, csharp, go, java-kotlin, javascript-typescript, python, ruby, swift
+  languages: []
+
+code_quality:
+  state: not-configured
+  # An empty list means GitHub detects the languages. Valid values:
+  # csharp, go, java-kotlin, javascript-typescript, python, ruby
+  languages: []
+
+ruleset:
+  # Tailor manages one ruleset named "Tailor" and owns it entirely.
+  # active enforces the rules. disabled keeps the ruleset on GitHub but
+  # GitHub ignores it, so a hand-made ruleset can govern instead.
+  enforcement: active
+  bypass_actors:
+    # actor_type: RepositoryRole, Team, User, Integration, DeployKey
+    # RepositoryRole actor_id: 2 maintain, 4 write, 5 admin
+    # bypass_mode: always, pull_request, exempt
+    - actor_id: 5
+      actor_type: RepositoryRole
+      bypass_mode: always
+  conditions:
+    ref_name:
+      # Branch names or fnmatch patterns in refs/heads/<name> form.
+      # include also accepts ~DEFAULT_BRANCH and ~ALL.
+      include:
+        - ~DEFAULT_BRANCH
+      exclude: []
+  rules:
+    creation: false
+    update: false
+    deletion: true
+    required_linear_history: false
+    required_signatures: false
+    non_fast_forward: true
+    pull_request:
+      enabled: true
+      parameters:
+        required_approving_review_count: 1
+        dismiss_stale_reviews_on_push: true
+        require_code_owner_review: false
+        require_last_push_approval: false
+        required_review_thread_resolution: true
+        require_extra_approval_for_unattributed_changes: true
+        # Any combination of merge, squash, rebase. At least one.
+        allowed_merge_methods:
+          - squash
+          - rebase
+    required_status_checks:
+      enabled: false
+      parameters:
+        # Require branches to be up to date before merging.
+        strict_required_status_checks_policy: false
+        # Do not require status checks on creation.
+        do_not_enforce_on_create: false
+        # context is the check name as shown on a pull request. For a GitHub
+        # Actions job that is the job's name. integration_id is optional and
+        # restricts the check to one app; 15368 is GitHub Actions.
+        required_status_checks: []
+    code_scanning:
+      enabled: false
+      parameters:
+        # tool is the tool name as GitHub shows it, for example CodeQL.
+        # alerts_threshold: none, errors, errors_and_warnings, all
+        # security_alerts_threshold: none, critical, high_or_higher, medium_or_higher, all
+        code_scanning_tools:
+          - tool: CodeQL
+            alerts_threshold: errors
+            security_alerts_threshold: high_or_higher
+
+# Pages is opt-in. Omission or enabled: false leaves Pages unmanaged.
+# generator: static (default) creates a starter in an empty path. Hugo and Jekyll need an existing site.
+# path: project-relative source directory, default pages.
+# branch: omit to use the current repository default branch.
+# cname: omit to preserve the domain, use "" to clear it, or set a domain.
+pages:
+  enabled: false
+  generator: static
+  path: pages
+  links:
+    website: https://wimpys.world/
+    forum: ""
+    x: ""
+    bluesky: https://bsky.app/profile/wimpys.world
+    mastodon: "https://wimpysworld.social/@martin"
+    linkedin: https://linkedin.com/in/martinwimpress
+    slack: ""
+    discord: https://discord.com/invite/vUsydfP
+    matrix: "https://matrix.to/#/@wimpress:matrix.org"
+    youtube: https://youtube.com/WimpysWorld
+    twitch: https://twitch.tv/WimpysWorld
+    peertube: ""
+    tiktok: ""
+    podcast: https://linuxmatters.sh
+    instagram: ""
+    pixelfed: ""
+    steam: https://steamcommunity.com/id/wimpress/
+    itchio: https://wimpress.itch.io/
+    patreon: ""
+    github_sponsors: https://github.com/sponsors/flexiondotorg
+    kofi: ""
+    email: ""
+    feed: ""
+  # branch: main
+  # cname: www.example.com
+  # Static only. Omit links to leave the page unchanged; {} clears its marked links.
+  # Use full HTTPS URLs, or a bare address for email. Empty values add no icon.
+  # links:
+  #   website: https://example.com
+  #   email: hello@example.com
+
+labels:
+  - name: bug
+    color: d20f39
+    description: "Something isn't working"
+
+  - name: documentation
+    color: 04a5e5
+    description: Documentation improvement
+
+  - name: duplicate
+    color: 8839ef
+    description: Already exists
+
+  - name: enhancement
+    color: 1e66f5
+    description: New feature request
+
+  - name: good first issue
+    color: 40a02b
+    description: Good for newcomers
+
+  - name: help wanted
+    color: "179299"
+    description: Extra attention needed
+
+  - name: invalid
+    color: e64553
+    description: Not valid or relevant
+
+  - name: question
+    color: 7287fd
+    description: Needs more information
+
+  - name: wontfix
+    color: dc8a78
+    description: Will not be worked on
+
+  - name: dependencies
+    color: fe640b
+    description: Dependency update
+
+  - name: github_actions
+    color: ea76cb
+    description: GitHub Actions update
+
+  - name: hacktoberfest-accepted
+    color: df8e1d
+    description: Hacktoberfest contribution
+
+# Repository Actions variables are non-secret values.
+# Tailor creates or updates only declared variables and leaves others unchanged.
+# variables:
+#   - name: DEPLOY_REGION
+#     value: "eu-west-2"
+#   - name: RELEASE_SUFFIX
+#     value: ""
+
+swatches:
+  - path: .github/dependabot.yml
+    alteration: first-fit
+
+  - path: .github/FUNDING.yml
+    alteration: first-fit
+
+  - path: .github/ISSUE_TEMPLATE/bug_report.yml
+    alteration: always
+
+  - path: .github/ISSUE_TEMPLATE/feature_request.yml
+    alteration: always
+
+  - path: .github/ISSUE_TEMPLATE/config.yml
+    alteration: first-fit
+
+  - path: .github/pull_request_template.md
+    alteration: never
+
+  - path: SECURITY.md
+    alteration: always
+
+  - path: CODE_OF_CONDUCT.md
+    alteration: always
+
+  - path: CONTRIBUTING.md
+    alteration: always
+
+  - path: SUPPORT.md
+    alteration: always
+
+  - path: justfile
+    alteration: first-fit
+
+  - path: flake.nix
+    alteration: first-fit
+
+  - path: .gitignore
+    alteration: first-fit
+
+  - path: .envrc
+    alteration: first-fit
+
+  - path: cubic.yaml
+    alteration: first-fit
+
+  - path: .github/workflows/tailor-pages.yml
+    alteration: always
+
+  - path: pages/index.html
+    alteration: first-fit
+
+  - path: pages/style.css
+    alteration: first-fit
+
+  - path: pages/theme.js
+    alteration: first-fit
+
+  - path: pages/icon.svg
+    alteration: first-fit
+
+  - path: wiki/Home.md
+    alteration: first-fit
+
+  - path: wiki/_Sidebar.md
+    alteration: first-fit
+
+  - path: wiki/_Footer.md
+    alteration: first-fit
+
+  - path: .github/workflows/tailor-wiki.yml
+    alteration: always
+
+  - path: .tailor.yml
+    alteration: always
