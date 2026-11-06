@@ -154,7 +154,7 @@ Each floor is about 10% under the lowest available space observed on public runn
 
 The `ubuntu-slim` job runs the action on `ubuntu-slim`, an unprivileged container runner with no loop devices and no mount support. It checks that the action skips, that the outputs are empty, and that `/nix` is not a Btrfs mount. The `👁️ Sentinel` job needs this job too.
 
-The `unsupported-os` job runs the action on `macos-15-intel` and `windows-latest`. It checks that the workflow continues, that the outputs are empty, and that `/nix` does not exist before Nix is installed. On macOS it then installs Nix with `DeterminateSystems/determinate-nix-action` and runs `neo-cowsay`. The `👁️ Sentinel` job needs this job too.
+The `unsupported-os` job runs the action on `macos-15-intel` and `windows-latest`. It checks that the workflow continues, that the outputs are empty, and that `/nix` does not exist. The job does not install Nix, because the Determinate Nix Installer does not support Intel macOS. The `👁️ Sentinel` job needs this job too.
 
 macOS runners are few, so the macOS matrix is small:
 

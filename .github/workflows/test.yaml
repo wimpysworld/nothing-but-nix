@@ -409,7 +409,6 @@ jobs:
       fail-fast: false
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -430,19 +429,12 @@ jobs:
             echo "::error::The action did not skip on ${RUNNER_OS}, because its outputs are not empty"
             exit 1
           fi
-          # Nix is not installed yet, so /nix exists only if the action ran
+          # This job does not install Nix, so /nix exists only if the action ran
           if [[ -e /nix ]]; then
-            echo "::error::/nix exists on ${RUNNER_OS} before Nix is installed, so the action did not skip"
+            echo "::error::/nix exists on ${RUNNER_OS}, so the action did not skip"
             exit 1
           fi
           echo "The action skipped on ${RUNNER_OS} and the workflow continues"
-      - uses: DeterminateSystems/determinate-nix-action@main
-        if: runner.os == 'macOS'
-      - name: Nix
-        if: runner.os == 'macOS'
-        run: |
-          nix --version
-          echo "Hello from macOS" | nix run "https://flakehub.com/f/NixOS/nixpkgs/*#neo-cowsay"
   lint:
     name: lint
     runs-on: ubuntu-24.04
