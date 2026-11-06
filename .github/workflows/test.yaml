@@ -1,9 +1,10 @@
 name: Test 🧪
 on:
+  pull_request:
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -65,12 +66,13 @@ jobs:
           # Build a package to ensure the Nix store is functional
           nix build "nixpkgs#hello"
   cachix-nix-action:
-    name: cachix-nix-action (${{ matrix.hatchet-protocol }}) on ${{ matrix.os }}
+    name: cachix-nix-action (${{ matrix.hatchet-protocol }}, edict ${{ matrix.nix-permission-edict }}) on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
         hatchet-protocol: [holster, carve, cleave, rampage]
+        nix-permission-edict: [true, false]
       fail-fast: false
     permissions:
       contents: read
@@ -85,7 +87,7 @@ jobs:
         with:
           hatchet-protocol: ${{ matrix.hatchet-protocol }}
           witness-carnage: true
-          nix-permission-edict: true
+          nix-permission-edict: ${{ matrix.nix-permission-edict }}
       - uses: cachix/install-nix-action@v31
       - name: Nix
         run: |

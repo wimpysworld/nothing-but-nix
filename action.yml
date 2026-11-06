@@ -178,22 +178,35 @@ runs:
         sudo btrfs device scan
         sudo btrfs filesystem show
 
-        # Mount filesystem
-        sudo mkdir -p /nix
-        sudo mount LABEL=nix /nix -o noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120
+        # Create one subvolume for /nix and one for temporary files
+        mount_opts="noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120"
+        btrfs_top="$(sudo mktemp --directory)"
+        sudo mount LABEL=nix "${btrfs_top}" -o "${mount_opts}"
+        sudo btrfs subvolume create "${btrfs_top}/@nix"
+        sudo btrfs subvolume create "${btrfs_top}/@tmp"
+        sudo umount "${btrfs_top}"
+        sudo rmdir "${btrfs_top}"
+
+        # Mount the subvolumes
+        sudo mkdir -p /nix /var/tmp/nothing-but-nix
+        sudo mount LABEL=nix /nix -o "subvol=@nix,${mount_opts}"
+        sudo mount LABEL=nix /var/tmp/nothing-but-nix -o "subvol=@tmp,${mount_opts}"
+        sudo chmod 1777 /var/tmp/nothing-but-nix
         sudo df -h
 
-        # Create /nix/build for Nix's build-dir setting and /nix/tmp for temporary files
+        # Create /nix/build for Nix's build-dir setting
         sudo mkdir -p /nix/build
-        sudo mkdir -p /nix/tmp && sudo chmod 1777 /nix/tmp
 
         if [[ "${{ inputs.nix-permission-edict }}" == "true" ]]; then
           echo "Applying Nix Permission Edict: Granting user ownership of /nix"
           sudo chown -R "$(id --user)":"$(id --group)" /nix
         fi
 
-        # Create TMPDIR on /nix/tmp so temporary files use the compressed Btrfs pool
-        TMPNIX="$(sudo mktemp --directory --tmpdir=/nix/tmp)"
+        # TMPDIR must stay outside /nix. The Nix multi-user installer runs
+        # `chown -R root:nixbld /nix`, which locks the installer out of its own
+        # temporary files under TMPDIR (#24, #57). The @tmp subvolume keeps
+        # temporary files on the compressed Btrfs pool.
+        TMPNIX="$(sudo mktemp --directory --tmpdir=/var/tmp/nothing-but-nix)"
         sudo chmod 1777 "${TMPNIX}"
         echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
 
