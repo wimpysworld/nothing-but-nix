@@ -169,6 +169,32 @@ These safe havens define how much space (in MB) will be mercifully spared during
 
 Increase these values if you need more breathing room on your filesystems, or decrease them to show no mercy! 😈
 
+### Choose the Compression 🗜️
+
+The `/nix` volume uses Btrfs `zstd:1` compression by default. Pick another with the `btrfs-compression` input:
+
+```yaml
+- uses: wimpysworld/nothing-but-nix@main
+  with:
+    hatchet-protocol: 'cleave'
+    btrfs-compression: 'zstd:3'  # Default: zstd:1
+```
+
+| Value              | Disk use | Compression speed | Use it when                                                 |
+|--------------------|----------|-------------------|-------------------------------------------------------------|
+| `none`             | 100%     | No cost           | The job writes only data that is already compressed         |
+| `zstd:-1`          | 40%      | 516 MB/s          | CPU time matters more than space (kernel 6.15 or later)     |
+| `zstd:1` (default) | 36%      | 493 MB/s          | Almost always                                               |
+| `zstd:3`           | 35%      | 342 MB/s          | 4% fewer stored bytes are worth 31% slower compression      |
+| `zstd:6`           | 33%      | 93 MB/s           | Space matters far more than write speed                     |
+| `lzo`              | 46%      | 295 MB/s          | Never, `zstd:1` beats it on space and speed                 |
+
+The figures come from a sample of Nix store paths, compressed on one CPU thread in 128 KiB blocks. Real CI stores hold more data that is already compressed, so expect 40% to 60% disk use at `zstd:1`.
+
+- Accepted values: `none`, `lzo`, `zlib`, `zlib:1` to `zlib:9`, `zstd`, `zstd:1` to `zstd:15`, and `zstd:-1` to `zstd:-15`. Any other value fails the step.
+- Negative `zstd` levels need Linux 6.15 or later. Older kernels, such as the 6.8 kernel on `ubuntu-22.04`, silently use level 3 instead, so the action uses `zstd:1` and prints a warning.
+- The action never uses `compress-force`, so Btrfs stops compressing a file when its first block does not shrink.
+
 ### Grant User Ownership of /nix (Nix Permission Edict) 🧑‍⚖️
 
 Some Nix installers or configurations expect the `/nix` directory to be writable by the current user. By default, `/nix` is owned by root. If you need user ownership (e.g., for certain Nix installer scripts that don't use `sudo` for all operations within `/nix`), you can enable the `nix-permission-edict`:

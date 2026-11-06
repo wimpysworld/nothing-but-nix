@@ -24,6 +24,10 @@ inputs:
     description: 'Grant user ownership of /nix directory (default: false). Useful for Nix installers that require user-writable /nix.'
     required: false
     default: 'false'
+  btrfs-compression:
+    description: 'Btrfs compression for /nix: none, lzo, zlib, zlib:1 to zlib:9, zstd, zstd:1 to zstd:15, or zstd:-1 to zstd:-15 (default: zstd:1)'
+    required: false
+    default: 'zstd:1'
 outputs:
   root-free-bytes:
     description: 'Free bytes on the / filesystem before the action purges anything'
@@ -163,7 +167,27 @@ runs:
     - name: The Volume
       if: steps.environment-check.outputs.is_supported == 'true'
       shell: bash
+      env:
+        BTRFS_COMPRESSION: ${{ inputs.btrfs-compression }}
       run: |
+        # Check the compression before anything changes on disk
+        compression="${BTRFS_COMPRESSION}"
+        if [[ ! "${compression}" =~ ^(none|lzo|zlib|zlib:[1-9]|zstd|zstd:-?([1-9]|1[0-5]))$ ]]; then
+          echo "::error::btrfs-compression '${compression}' is not valid. Use none, lzo, zlib, zlib:1 to zlib:9, zstd, zstd:1 to zstd:15, or zstd:-1 to zstd:-15."
+          exit 1
+        fi
+        # Kernels older than 6.15 map a negative zstd level to level 3
+        # without a warning, and level 3 is slower than level 1.
+        if [[ "${compression}" == zstd:-* ]]; then
+          kernel_release="$(uname -r)"
+          if [[ ! "${kernel_release}" =~ ^([0-9]+)\.([0-9]+) ]] ||
+            (( BASH_REMATCH[1] < 6 || (BASH_REMATCH[1] == 6 && BASH_REMATCH[2] < 15) )); then
+            echo "::warning::btrfs-compression ${compression} needs kernel 6.15 or later, and this runner has ${kernel_release}, so /nix uses zstd:1"
+            compression="zstd:1"
+          fi
+        fi
+        echo "Btrfs compression: ${compression}"
+
         free_space=$(df -m --output=avail /mnt | tail -n 1 | tr -d ' ')
         echo "Initial free space of /mnt: ${free_space}MB"
 
@@ -218,7 +242,11 @@ runs:
         sudo btrfs filesystem show
 
         # Create one subvolume for /nix and one for temporary files
-        mount_opts="noatime,nobarrier,nodiscard,compress=zstd:1,space_cache=v2,commit=120"
+        mount_opts="noatime,nobarrier,nodiscard"
+        if [[ "${compression}" != "none" ]]; then
+          mount_opts+=",compress=${compression}"
+        fi
+        mount_opts+=",space_cache=v2,commit=120"
         btrfs_top="$(sudo mktemp --directory)"
         sudo mount LABEL=nix "${btrfs_top}" -o "${mount_opts}"
         sudo btrfs subvolume create "${btrfs_top}/@nix"
