@@ -140,7 +140,11 @@ When editing `action.yml`:
 
 ### Adding New Purge Targets
 
-Follow this pattern in the expansion script:
+Add a large tree that no dpkg package owns, for example a toolchain from an install script or a tarball, to `fast_trees`. At run time `unowned_paths` drops any path that dpkg owns, so the purge does not delete dpkg files behind dpkg's back. Do not add a `path-exclude` to `01_nocruft` for a toolchain path. That file is only for documentation paths, and an exclude on a toolchain path makes a later `apt-get install` of that toolchain incomplete.
+
+Cleave deletes `/usr/local/lib/android` and `/usr/local/.ghcup` with `/usr/local.purge`, and `fast_trees` adds `/opt/ghc`, `/usr/share/dotnet`, and `/usr/share/swift`.
+
+For other targets, follow this pattern in the expansion script:
 
 ```bash
 if [[ "$protocol_level" -ge 2 ]]; then
