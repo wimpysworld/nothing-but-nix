@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-This is a GitHub Actions composite action that purges bloat from Ubuntu runners to maximise disk space for Nix. It creates a 65GB-130GB `/nix` volume (versus the default ~20GB) by:
+This is a GitHub Actions composite action that purges bloat from Ubuntu runners to maximise disk space for Nix. It creates a `/nix` volume of about 85GiB to 128GiB on public x64 runners (versus the default ~20GB) by:
 
-1. Creating a BTRFS filesystem on loop devices using free space from `/mnt`
+1. Creating a BTRFS filesystem on loop devices using free space from `/mnt`, which shares the root disk on current images
 2. Purging unnecessary software in the background (Docker images, language runtimes, documentation, etc.)
 3. Dynamically expanding the `/nix` volume as space becomes available
 
@@ -185,7 +185,7 @@ An expansion disk is only created if `free_space > (root_safe_haven + 2048)`. Th
 
 The `/nix` volume grows in up to three phases:
 
-1. **Initial volume** (1-10 seconds): Created from `/mnt` free space, provides ~65GB immediately
+1. **Initial volume** (1-10 seconds): Created from `/mnt` free space, provides about 85GiB immediately on public x64 runners
 2. **First expansion disk**: Added from `/` after the purge deletes the large trees that dpkg does not own
 3. **Second expansion disk**: Added from `/` after the Docker, apt, and remaining `rmz` work
 
