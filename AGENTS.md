@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a GitHub Actions composite action that purges bloat from Ubuntu runners to maximise disk space for Nix. It creates a `/nix` volume of about 85GiB to 128GiB on public x64 runners (versus the default ~20GB) by:
+This is a GitHub Actions composite action that purges bloat from Ubuntu runners to maximise disk space for Nix. It creates a `/nix` volume with about 83GiB to 133GiB available on public x64 runners and about 104GiB to 133GiB on public arm64 runners. A stock public runner has about 86-88GiB free on `/` (x64) or about 106GiB (arm64). Btrfs `zstd:1` compression lets the store hold more than the raw size, and on x64 cleave and rampage add about 34-49GiB. The figures come from public GitHub-hosted runners in November 2026 and change with the runner image. The action works by:
 
 1. Creating a BTRFS filesystem on loop devices using free space from `/mnt`, which shares the root disk on current images
 2. Purging unnecessary software in the background (Docker images, language runtimes, documentation, etc.)
@@ -194,7 +194,7 @@ An expansion disk is only created if `free_space > (root_safe_haven + 2048)`. Th
 
 The `/nix` volume grows in up to three phases:
 
-1. **Initial volume** (1-10 seconds): Created from `/mnt` free space, provides about 85GiB immediately on public x64 runners
+1. **Initial volume** (1-3 seconds for the whole action before the purge): Created from the free space of `/mnt`, which shares the root disk on current images. It provides about 83-86GiB on public x64 runners and about 104GiB on public arm64 runners
 2. **First expansion disk**: Added from `/` after the purge deletes the large trees that dpkg does not own
 3. **Second expansion disk**: Added from `/` after the Docker, apt, and remaining `rmz` work
 
@@ -213,9 +213,11 @@ sudo btrfs device add --nodiscard ${loop_dev} /nix
 ### Background Execution
 
 By default, purging runs in the background (`witness-carnage: false`):
-- Workflow continues immediately after initial volume creation
+- Workflow continues after initial volume creation, 2-3 seconds after the action starts. The purge then runs for 71-91 seconds (cleave) or 173-185 seconds (rampage)
 - Expansion happens whilst Nix installs and builds
 - Post-action reports final state
+
+With `witness-carnage: true`, the purge runs in the foreground and takes 14-82 seconds for carve, 36-108 seconds for cleave, and 111-235 seconds for rampage on public runners. Holster has no purge.
 
 ### TMPDIR Relocation
 
