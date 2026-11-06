@@ -176,7 +176,7 @@ fi
 ### Safe Haven Adjustments
 
 Safe havens prevent filesystem exhaustion:
-- `root-safe-haven`: Space reserved on `/` (default: `auto`). `auto` reserves 10240MB for holster and carve, and 6144MB for cleave and rampage. A positive whole number of MB overrides it. Any other value fails The Hatchet Protocol with `::error::`
+- `root-safe-haven`: Space reserved on `/` (default: `auto`). `auto` reserves 10240MB for holster and carve, and 6144MB for cleave and rampage, capped at 25% of the free space of `/` when the action starts and never less than 2048MB. The cap keeps a fixed reserve from taking most of a small disk, for example the about 18 GB free on a private 2-CPU runner, where holster would otherwise get only about 8 GB for `/nix`. The Hatchet Protocol logs the resolved value, and the reason when the cap applies. A number is never capped. A positive whole number of MB overrides it. Any other value fails The Hatchet Protocol with `::error::`
 - `mnt-safe-haven`: Space reserved on `/mnt` (default: 1024MB)
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved during initial volume creation and expansion
 
