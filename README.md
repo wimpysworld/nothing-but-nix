@@ -35,6 +35,7 @@
 
 GitHub Actions runners come with about 86-88GiB free on `/` (x64) and a disk stuffed with tools that Nix never uses.
 *Nothing but Nix* **brutally purges** unnecessary software and pools the space into a compressed Btrfs `/nix`, giving you **about 75GiB to 129GiB** for your Nix store! 💪
+On macOS runners on Apple silicon it takes the hatchet to Xcode, simulators, and friends, so the Nix installer has room to breathe. 🍎
 
 ## Usage 🔧
 
@@ -60,10 +61,10 @@ jobs:
 
 ### Requirements ️✔️
 
-- Only supports official **Ubuntu** GitHub Actions runners
-  - Tested on Ubuntu 22.04, 24.04 and 26.04 on x64, and on Ubuntu 24.04 and 26.04 on arm64
+- Only supports official **Ubuntu** GitHub Actions runners and official **macOS** runners on **Apple silicon** (arm64)
+  - Tested on Ubuntu 22.04, 24.04 and 26.04 on x64, on Ubuntu 24.04 and 26.04 on arm64, and on `macos-15` and `macos-26`
 - Must run **before** Nix is installed
-- **macOS/Darwin runners**: This action will gracefully skip with a warning if run on macOS. macOS runners are not supported yet. `macos-14` and `macos-15` runners can start with only 40 to 47 GB free, so a large Nix store can still run out of space there
+- **Intel macOS runners** such as `macos-15-intel`: This action will gracefully skip with a notice. Nixpkgs is deprecating `x86_64-darwin`, so Intel Macs get no hatchet
 - **Windows runners**: This action will gracefully skip with a warning if run on Windows. Windows runners have different filesystem layouts and constraints
 - **Container runners such as `ubuntu-slim`**: This action will gracefully skip with a warning when the runner has no loop devices. The action checks that `/dev/loop-control` exists and that `sudo -n losetup --find` succeeds. `ubuntu-slim` is an unprivileged container with no loop devices and no mount support, so a later Nix install uses the container disk as it is
 
@@ -146,6 +147,25 @@ Choose wisely:
 The `/nix` sizes are the available space observed on public GitHub-hosted runners in November 2026, and they change when GitHub updates the runner images. Btrfs `zstd:1` compression lets the store hold more than these raw sizes. On x64, Cleave and Rampage add about 38-53GiB over Holster. Private repositories get smaller disks, so expect less.
 
 GitHub does not guarantee a separate `/mnt` disk. On current images `/` and `/mnt` share one disk, so Holster takes the free space of that disk through `/mnt`. On these single-disk runners, Carve gains its extra space from the fast purge, not from `/mnt`.
+
+### macOS on Apple silicon 🍎
+
+macOS does things differently. Every volume on the runner shares one APFS container, so there is no Btrfs pool to grow. The action frees space on the Data volume (`/System/Volumes/Data`), and the Nix installer then creates its own `Nix Store` APFS volume from that free space. The action never creates that volume itself, because the Determinate installer refuses to install over an existing one.
+
+The purge moves each target into `/private/var/tmp/nothing-but-nix.staging`, which is instant on the same volume, then deletes the staging directory with `rmz`. With the default `witness-carnage: false`, the delete runs in the background and the next step starts at once. Paths that do not exist are skipped. The Command Line Tools (`/Library/Developer/CommandLineTools`) always survive, so `/usr/bin/git` and `actions/checkout` keep working.
+
+| Protocol | Data volume gained | Purge time (foreground) | Removes | Keeps | Can break in a later step |
+|----------|--------------------|-------------------------|---------|-------|---------------------------|
+| Holster | Nothing | No purge | Nothing. The action reports the free space of the Data volume | Everything on the runner image | Nothing |
+| Carve | Measured in CI | Measured in CI | The tool cache (`/Users/runner/hostedtoolcache`), the Android SDK (`~/Library/Android/sdk`), .NET (`/usr/local/share/dotnet`, `~/.dotnet`), GHCup (`~/.ghcup`), Mono (`/Library/Frameworks/Mono.framework`), and Xamarin (`/Library/Frameworks/Xamarin*`) | Every Xcode, the simulator runtimes, Homebrew, Rust, and the browsers | A step that uses the preinstalled Android SDK, .NET, GHC, Mono, or Xamarin. A `setup-*` action that expects a version in the tool cache must download it |
+| Cleave | Measured in CI | Measured in CI | Everything that Carve removes, plus every simulator runtime (`xcrun simctl runtime delete all`), every `/Applications/Xcode*.app` except the default one that `xcode-select -p` points at, `~/Library/Developer`, `~/Library/Caches`, and Rust (`~/.rustup`, `~/.cargo`) | The default Xcode, Homebrew, and the browsers | Everything that Carve breaks, plus a step that needs another Xcode version, a simulator, or the preinstalled Rust |
+| Rampage | Measured in CI | Measured in CI | Everything that Cleave removes, plus the default Xcode, `/Library/Developer/CoreSimulator`, Homebrew (`/opt/homebrew`), Google Chrome, Firefox, and Microsoft Edge. Then `xcode-select` switches to the Command Line Tools | The Command Line Tools, so `git`, `clang`, and `make` still work | Everything that Cleave breaks, plus `xcodebuild`, Swift from Xcode, every Homebrew tool (for example `gh`, `jq`, and `yq`), and the browsers. `shell: bash` steps fall back to the macOS `/bin/bash` 3.2 |
+
+The sizes and times will come from CI runs on public GitHub-hosted runners.
+
+Some inputs make no sense on macOS. `root-safe-haven`, `mnt-safe-haven`, `nix-permission-edict`, and `btrfs-compression` do nothing there, and each prints one notice when you set it to anything but its default. The action does not create `/nix/build` and does not set `TMPDIR` on macOS.
+
+The `xcode-27` runner (the macOS 27 preview) gets a Rampage test too, but it is a preview, so its result never blocks a merge.
 
 ### Witness The Carnage 🩸
 
@@ -247,12 +267,12 @@ The action reports the space it makes and how long the purge takes:
 
 | Output            | Description                                                                           |
 |-------------------|---------------------------------------------------------------------------------------|
-| `root-free-bytes` | Free bytes on `/` before the purge                                                    |
-| `nix-size-bytes`  | Size of `/nix` in bytes when the action finishes                                      |
-| `nix-avail-bytes` | Available bytes on `/nix` when the action finishes                                    |
+| `root-free-bytes` | Free bytes on `/` before the purge, or on `/System/Volumes/Data` on macOS             |
+| `nix-size-bytes`  | Size of `/nix` in bytes when the action finishes. Empty on macOS                      |
+| `nix-avail-bytes` | Available bytes on `/nix` when the action finishes. Empty on macOS                    |
 | `purge-seconds`   | Duration of the purge in seconds. Empty in the background, where the purge still runs |
 
-In the background (`witness-carnage: false`), `/nix` keeps growing after the action finishes. The post step writes the final numbers to the job summary.
+In the background (`witness-carnage: false`), `/nix` keeps growing after the action finishes. The post step writes the final numbers to the job summary. On macOS the Nix installer creates `/nix` after the action, so the `/nix` outputs stay empty, and the job summary shows the free space of the Data volume before and after instead.
 
 ```yaml
 - uses: wimpysworld/nothing-but-nix@main
