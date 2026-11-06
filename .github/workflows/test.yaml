@@ -311,7 +311,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        os: [macos-15, macos-26]
+        # xcode-27 is the macOS 27 preview image until GitHub adds macos-27.
+        os: [macos-15, macos-26, xcode-27]
         deleter: [rm, rmz]
       fail-fast: false
     permissions:
