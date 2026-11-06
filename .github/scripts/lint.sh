@@ -25,9 +25,6 @@ shellcheck .github/scripts/*.sh || status=1
 #   needs no exclusion.
 # - The second line exports the names in the step env map, so that they
 #   do not count as unassigned (SC2153).
-# - SC2086 on an unquoted $GITHUB_OUTPUT or $GITHUB_ENV redirect target is
-#   dropped. The runner sets both to paths with no spaces, and action.yml
-#   leaves them unquoted. SC2086 on any other word still fails.
 # Each finding names its line in action.yml. The column counts from the
 # indentation of the step body.
 work="$(mktemp --directory)"
@@ -63,19 +60,14 @@ for ((i = 0; i < steps; i++)); do
     status=1
   fi
   awk -v script="${script}" -v first="${first_line}" -v name="${name}" '
-    FNR == NR { source[FNR] = $0; next }
     index($0, script ":") == 1 {
       rest = substr($0, length(script) + 2)
       split(rest, parts, ":")
-      if ($0 ~ /\[SC2086\]$/ &&
-        substr(source[parts[1]], parts[2]) ~ /^\$(GITHUB_OUTPUT|GITHUB_ENV)([^A-Za-z0-9_]|$)/) {
-        next
-      }
       found = 1
       print "action.yml:" (parts[1] + first - 3) substr(rest, length(parts[1]) + 1) " (" name ")"
     }
     END { exit found }
-  ' "${script}" "${work}/findings" || status=1
+  ' "${work}/findings" || status=1
 done
 
 exit "${status}"

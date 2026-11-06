@@ -50,7 +50,7 @@ runs:
       run: |
         # Check for macOS/Darwin - warn but don't fail
         if [[ "${{ runner.os }}" == "macOS" ]]; then
-          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "is_supported=false" >> "${GITHUB_OUTPUT}"
           echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
           echo "ℹ️  macOS/Darwin runners are not supported yet. They can start with only 40 to 47 GB free, so a large Nix store can still run out of space."
           echo "ℹ️  This action will be skipped and your workflow will continue normally."
@@ -59,7 +59,7 @@ runs:
 
         # Check for Windows - warn but don't fail
         if [[ "${{ runner.os }}" == "Windows" ]]; then
-          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "is_supported=false" >> "${GITHUB_OUTPUT}"
           echo "⚠️  Nothing but Nix is designed for Ubuntu runners only."
           echo "ℹ️  Windows runners do not require this action - they have different filesystem layouts and constraints."
           echo "ℹ️  This action will be skipped and your workflow will continue normally."
@@ -87,28 +87,28 @@ runs:
         # Check for Ubuntu on Linux runners
         if [[ "${{ runner.os }}" == "Linux" ]]; then
           if [ "$(lsb_release -is)" != "Ubuntu" ]; then
-            echo "is_supported=false" >> $GITHUB_OUTPUT
+            echo "is_supported=false" >> "${GITHUB_OUTPUT}"
             echo "❌ This action only works on Ubuntu runners"
             exit 1
           else
-            echo "is_supported=true" >> $GITHUB_OUTPUT
+            echo "is_supported=true" >> "${GITHUB_OUTPUT}"
           fi
         fi
 
         # Check for GitHub Actions environment
         if [ -z "$GITHUB_ACTIONS" ]; then
-          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "is_supported=false" >> "${GITHUB_OUTPUT}"
           echo "❌ This action only works on GitHub Actions runners"
           exit 1
         fi
 
         # Check that Nix is not already installed
         if [ -d /nix ]; then
-          echo "is_supported=false" >> $GITHUB_OUTPUT
+          echo "is_supported=false" >> "${GITHUB_OUTPUT}"
           echo "❌ This action must be run before Nix is installed"
           exit 1
         else
-          echo "is_supported=true" >> $GITHUB_OUTPUT
+          echo "is_supported=true" >> "${GITHUB_OUTPUT}"
         fi
     - name: The Hatchet Protocol
       id: set-hatchet-protocol
@@ -177,9 +177,11 @@ runs:
           exit 1
         fi
 
-        echo "level=${protocol_level}" >> $GITHUB_OUTPUT
-        echo "name=${protocol_name}" >> "${GITHUB_OUTPUT}"
-        echo "root-safe-haven=${root_safe_haven}" >> "${GITHUB_OUTPUT}"
+        {
+          echo "level=${protocol_level}"
+          echo "name=${protocol_name}"
+          echo "root-safe-haven=${root_safe_haven}"
+        } >> "${GITHUB_OUTPUT}"
     - name: The Survey
       id: survey
       if: steps.environment-check.outputs.is_supported == 'true'
@@ -330,7 +332,7 @@ runs:
         # the step when TMPDIR resolves under /nix.
         TMPNIX="$(sudo mktemp --directory --tmpdir=/var/tmp/nothing-but-nix)"
         sudo chmod 1777 "${TMPNIX}"
-        echo "TMPDIR=${TMPNIX}" >> $GITHUB_ENV
+        echo "TMPDIR=${TMPNIX}" >> "${GITHUB_ENV}"
         if ! tmpdir_real="$(realpath -e "${TMPNIX}")"; then
           echo "::error::TMPDIR (${TMPNIX}) could not be resolved"
           exit 1

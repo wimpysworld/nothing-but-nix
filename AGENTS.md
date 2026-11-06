@@ -89,7 +89,7 @@ Run the lint script before you push. It needs no `just` recipe:
 nix develop --command .github/scripts/lint.sh
 ```
 
-The script runs `actionlint` on the workflows, `shellcheck` on `.github/scripts/*.sh`, and `shellcheck` on each Bash body in `action.yml`, including the `post-run` body of The Post. It uses `yq` to extract each body, replaces each `${{ ... }}` expression with the variable `${GHA_EXPR}`, and exports the names in the step `env` map. Each finding names its line in `action.yml`. The substitution causes no finding, so the script excludes no code for it. The script drops only SC2086 on an unquoted `$GITHUB_OUTPUT` or `$GITHUB_ENV`, which `action.yml` uses as redirect targets. SC2086 on any other word still fails. The `lint` job in `test.yaml` runs the same script with `actionlint` 1.7.12, pinned by SHA-256, and the `shellcheck` and `yq` of the `ubuntu-24.04` runner image. The `👁️ Sentinel` job needs this job too.
+The script runs `actionlint` on the workflows, `shellcheck` on `.github/scripts/*.sh`, and `shellcheck` on each Bash body in `action.yml`, including the `post-run` body of The Post. It uses `yq` to extract each body, replaces each `${{ ... }}` expression with the variable `${GHA_EXPR}`, and exports the names in the step `env` map. Each finding names its line in `action.yml`. The substitution causes no finding, and the script excludes no shellcheck code. The `lint` job in `test.yaml` runs the same script with `actionlint` 1.7.12, pinned by SHA-256, and the `shellcheck` and `yq` of the `ubuntu-24.04` runner image. The `👁️ Sentinel` job needs this job too.
 
 ### Manual Testing
 
