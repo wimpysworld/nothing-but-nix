@@ -177,7 +177,7 @@ These safe havens define how much space (in MB) will be mercifully spared during
 - When `/` and `/mnt` share the same filesystem, the larger of `root-safe-haven` and `mnt-safe-haven` is reserved
 - `root-safe-haven` accepts `auto` or a positive whole number of MB. Any other value fails the step
 
-After every protocol, `/` keeps only the safe haven. The workspace, the `setup-*` toolchains, caches, `/tmp`, and the runner logs still write to `/`. Holster and Carve also keep Docker, and Docker writes its images and containers to `/`, so `auto` reserves more for them. The extra reserve costs `/nix` about 8GiB with Holster and Carve, and about 4GiB with Cleave and Rampage, compared with a 2GiB reserve.
+When `/` and `/mnt` share a disk, every protocol leaves `/` with about the safe haven. When they are separate disks, Holster leaves `/` alone, and Carve, Cleave, and Rampage claim the free space of `/` down to about the safe haven. They claim it only when `/` has more than 2GiB above the safe haven free, so `/` can keep up to 2GiB extra. The workspace, the `setup-*` toolchains, caches, `/tmp`, and the runner logs still write to `/`. Holster and Carve also keep Docker, and Docker writes its images and containers to `/`, so `auto` reserves more for them. The extra reserve costs `/nix` about 8GiB with Holster and Carve, and about 4GiB with Cleave and Rampage, compared with a 2GiB reserve.
 
 Raise `root-safe-haven` when the job writes a lot to `/`, for example a large Docker build, a big checkout, or large caches. Lower it to give `/nix` more space when the job writes almost nothing outside `/nix`. Show no mercy! 😈 The post step writes the free space of `/` at the end of the job to the job summary, and warns when it is below 1GiB.
 
