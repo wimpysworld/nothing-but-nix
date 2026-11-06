@@ -106,6 +106,21 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
         hatchet-protocol: [holster, carve, cleave, rampage]
         nix-permission-edict: [true, false]
+        # The multi-user installer runs `chown -R root:nixbld /nix` (#57), so
+        # test it on arm64 too. One protocol is enough for that check.
+        include:
+          - os: ubuntu-24.04-arm
+            hatchet-protocol: holster
+            nix-permission-edict: true
+          - os: ubuntu-24.04-arm
+            hatchet-protocol: holster
+            nix-permission-edict: false
+          - os: ubuntu-26.04-arm
+            hatchet-protocol: holster
+            nix-permission-edict: true
+          - os: ubuntu-26.04-arm
+            hatchet-protocol: holster
+            nix-permission-edict: false
       fail-fast: false
     permissions:
       contents: read
