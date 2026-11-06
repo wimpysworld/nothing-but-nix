@@ -63,7 +63,9 @@ The action follows a specific execution order:
 - `nix-size-bytes` and `nix-avail-bytes`: size and available bytes of `/nix` when the action finishes. In background mode the purge can grow `/nix` after that.
 - `purge-seconds`: duration of the purge. It is empty in background mode, because the purge is still running when the action finishes.
 
-The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`.
+The purge writes `purge_seconds` to `${HOME}/.expansion` when it exits, and `all_done` only when it succeeds. The post step reads both files and writes the protocol, runner, `/nix` size and available space, purge seconds, and purge state to `$GITHUB_STEP_SUMMARY`. When the purge started but did not succeed, the post step writes a `::warning::` and prints the last 50 lines of `expansion.log`.
+
+The purge passes only installed packages to `apt-get`. `installed_packages` matches each extended regular expression against the whole package name, so a pattern that matches no installed package cannot stop the script under `set -e`.
 
 ### Naming Conventions
 

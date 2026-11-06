@@ -279,6 +279,33 @@ runs:
           root_safe_haven="${mnt_safe_haven}"
         fi
 
+        # Print the installed packages whose names match one or more of the
+        # given extended regular expressions. Each expression must match the
+        # whole package name.
+        function installed_packages() {
+          local regex
+          regex="^($(IFS='|'; echo "$*")) "
+          # shellcheck disable=SC2016 # dpkg-query expands these fields
+          dpkg-query --show --showformat='${db:Status-Status} ${Package} ${binary:Package}\n' |
+            awk '$1 == "installed" { print $2 " " $3 }' |
+            grep -E "${regex}" |
+            cut -d ' ' -f 2 |
+            sort -u
+        }
+
+        # Remove and purge the installed packages that match the given
+        # expressions. apt-get fails on a name that matches no package, and
+        # set -e then stops the purge, so pass only installed packages.
+        function remove_packages() {
+          local packages=()
+          mapfile -t packages < <(installed_packages "$@")
+          if [[ "${#packages[@]}" -eq 0 ]]; then
+            echo "No installed package matches: $*"
+            return 0
+          fi
+          sudo apt-get -y remove --purge "${packages[@]}"
+        }
+
         function add_expansion_disk() {
           # Check for additional free space after purging
           free_space=$(df -m --output=avail / | tail -n 1 | tr -d ' ')
@@ -315,14 +342,14 @@ runs:
             docker rmi --force "${CRUFT}" || true
           done
           docker system prune --all --force
-          sudo apt-get -y remove --purge '^docker.*'
+          remove_packages 'docker.*'
           sudo rmz -f /usr/bin/docker* /var/lib/docker
           echo "Cleanse docker complete" > $expansion_dir/docker_done
         fi
 
         # Cleanse snap
         if [[ "$protocol_level" -ge 2 ]]; then
-          sudo apt-get -y remove --purge snapd
+          remove_packages snapd
           sudo rmz -f \
             /snap \
             /usr/lib/snapd \
@@ -343,56 +370,56 @@ runs:
         APTCFG
 
           if [[ "$protocol_level" -ge 3 ]]; then
-            sudo apt-get -y remove --purge \
-              '^apache2.*' \
-              '^aspnetcore-.*' \
-              azure-cli \
-              buildah \
-              '^byobu.*' \
-              '^clang-.*' \
-              containerd.io \
-              containernetworking-plugins \
-              '^dotnet-.*' \
-              firefox \
-              '^fonts-.*' \
-              fwupd \
-              '^gfortran-.*' \
-              '^google-.*' \
-              '^gradle.*' \
-              '^java.*' \
-              '^kotlin.*' \
-              kubectl \
-              '^libclang-.*' \
-              libgl1-mesa-dri \
-              '^libgirepository-.*' \
-              '^libgtk-.*' \
-              '^libllvm-.*' \
-              '^libx265-.*' \
-              '^llvm-.*' \
-              man-db \
-              '^mecab.*' \
-              mediainfo \
-              '^mercurial.*' \
-              microsoft-edge-stable \
-              '^mongodb-.*' \
-              '^mono-.*' \
-              '^mssql-.*' \
-              '^mysql-.*' \
-              '^nginx-.*' \
-              '^php.*' \
-              '^podman.*' \
-              '^powershell.*' \
-              '^postgres.*' \
-              python-babel-localedata \
-              '^python3-babel.*' \
-              '^python3-boto.*' \
-              '^ruby.*' \
-              '^r-base.*' \
-              skopeo \
-              tcl \
-              tk \
-              '^tex-.*' \
-              '^vim.*'
+            remove_packages \
+              'apache2.*' \
+              'aspnetcore-.*' \
+              'azure-cli' \
+              'buildah' \
+              'byobu.*' \
+              'clang-.*' \
+              'containerd\.io' \
+              'containernetworking-plugins' \
+              'dotnet-.*' \
+              'firefox' \
+              'fonts-.*' \
+              'fwupd' \
+              'gfortran-.*' \
+              'google-.*' \
+              'gradle.*' \
+              'java.*' \
+              'kotlin.*' \
+              'kubectl' \
+              'libclang-.*' \
+              'libgl1-mesa-dri' \
+              'libgirepository-.*' \
+              'libgtk-.*' \
+              'libllvm-.*' \
+              'libx265-.*' \
+              'llvm-.*' \
+              'man-db' \
+              'mecab.*' \
+              'mediainfo' \
+              'mercurial.*' \
+              'microsoft-edge-stable' \
+              'mongodb-.*' \
+              'mono-.*' \
+              'mssql-.*' \
+              'mysql-.*' \
+              'nginx-.*' \
+              'php.*' \
+              'podman.*' \
+              'powershell.*' \
+              'postgres.*' \
+              'python-babel-localedata' \
+              'python3-babel.*' \
+              'python3-boto.*' \
+              'ruby.*' \
+              'r-base.*' \
+              'skopeo' \
+              'tcl' \
+              'tk' \
+              'tex-.*' \
+              'vim.*'
           fi
 
           sudo apt-get -y autoremove --purge
@@ -516,6 +543,17 @@ runs:
               echo "| --- | --- | --- | --- | --- | --- |"
               echo "| ${protocol} | ${runner_desc} | ${nix_size} | ${nix_avail} | ${purge_seconds} | ${purge_finished} |"
             } >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+          # The protocol file exists only when the purge started.
+          if [[ -e "${expansion_dir}/protocol" && "${purge_finished}" != "yes" ]]; then
+            if [[ "${purge_finished}" == "no, failed" ]]; then
+              echo "::warning::The ${protocol} purge failed, so /nix did not get all of the freed space. See the end of expansion.log below."
+            else
+              echo "::warning::The ${protocol} purge did not finish before the job ended, so /nix did not get all of the freed space. See the end of expansion.log below."
+            fi
+            echo "Last 50 lines of ${expansion_dir}/expansion.log:"
+            tail -n 50 "${expansion_dir}/expansion.log" 2>/dev/null || echo "expansion.log not found"
           fi
 
           ls -ltr "${expansion_dir}"/*_done || true
