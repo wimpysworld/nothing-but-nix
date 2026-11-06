@@ -305,7 +305,7 @@ jobs:
   # is not in the needs of sentinel and must never block a merge. It deletes
   # only in the timing steps.
   macos-survey:
-    name: macos survey (${{ matrix.deleter }}) on ${{ matrix.os }}
+    name: macos survey on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     timeout-minutes: 30
@@ -313,7 +313,6 @@ jobs:
       matrix:
         # xcode-27 is the macOS 27 preview image until GitHub adds macos-27.
         os: [macos-15, macos-26, xcode-27]
-        deleter: [rm, rmz]
       fail-fast: false
     permissions:
       contents: read
@@ -428,7 +427,6 @@ jobs:
       - name: Time the move and delete of the Android SDK
         continue-on-error: true
         env:
-          DELETER: ${{ matrix.deleter }}
           RMZ_VERSION: '3.2.1'
           # SHA-256 of aarch64-apple-darwin-rmz in the fuc 3.2.1 release
           RMZ_SHA256: 'da01fabf7169daab1b115175fe816731a76f281291bd084a859e4266eec3970c'
@@ -443,17 +441,15 @@ jobs:
             echo "### Android SDK: ${sdk} does not exist, timing skipped" >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
-          if [[ "${DELETER}" == "rmz" ]]; then
-            rmz_dir="$(mktemp -d)"
-            curl --fail --silent --show-error --location --retry 3 -o "${rmz_dir}/rmz" \
-              "https://github.com/SUPERCILEX/fuc/releases/download/${RMZ_VERSION}/aarch64-apple-darwin-rmz"
-            if ! echo "${RMZ_SHA256}  ${rmz_dir}/rmz" | shasum -a 256 --check --quiet; then
-              echo "::warning::The rmz ${RMZ_VERSION} download does not match the expected SHA-256 ${RMZ_SHA256}"
-              echo "### Android SDK: the rmz download failed its checksum, timing skipped" >> "${GITHUB_STEP_SUMMARY}"
-              exit 0
-            fi
-            chmod +x "${rmz_dir}/rmz"
+          rmz_dir="$(mktemp -d)"
+          curl --fail --silent --show-error --location --retry 3 -o "${rmz_dir}/rmz" \
+            "https://github.com/SUPERCILEX/fuc/releases/download/${RMZ_VERSION}/aarch64-apple-darwin-rmz"
+          if ! echo "${RMZ_SHA256}  ${rmz_dir}/rmz" | shasum -a 256 --check --quiet; then
+            echo "::warning::The rmz ${RMZ_VERSION} download does not match the expected SHA-256 ${RMZ_SHA256}"
+            echo "### Android SDK: the rmz download failed its checksum, timing skipped" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
           fi
+          chmod +x "${rmz_dir}/rmz"
           staging="/private/var/tmp/nothing-but-nix.staging"
           sudo mkdir -p "${staging}"
           df -k /System/Volumes/Data
@@ -461,26 +457,21 @@ jobs:
           t0="$(now)"
           sudo mv "${sdk}" "${staging}/android-sdk"
           t1="$(now)"
-          if [[ "${DELETER}" == "rmz" ]]; then
-            sudo "${rmz_dir}/rmz" -f "${staging}/android-sdk"
-          else
-            sudo rm -rf "${staging}/android-sdk"
-          fi
+          sudo "${rmz_dir}/rmz" -f "${staging}/android-sdk"
           t2="$(now)"
           df -k /System/Volumes/Data
           free_after="$(data_free)"
           mv_seconds="$(elapsed "${t0}" "${t1}")"
           delete_seconds="$(elapsed "${t1}" "${t2}")"
-          echo "mv: ${mv_seconds} s, ${DELETER}: ${delete_seconds} s, Data free ${free_before} before, ${free_after} after"
+          echo "mv: ${mv_seconds} s, rmz: ${delete_seconds} s, Data free ${free_before} before, ${free_after} after"
           {
-            echo "### Android SDK on $(sw_vers -productVersion) with ${DELETER}"
+            echo "### Android SDK on $(sw_vers -productVersion) with rmz"
             echo
-            echo "| Deleter | mv seconds | Delete seconds | Data free before | Data free after |"
-            echo "| --- | --- | --- | --- | --- |"
-            echo "| ${DELETER} | ${mv_seconds} | ${delete_seconds} | ${free_before} | ${free_after} |"
+            echo "| mv seconds | rmz seconds | Data free before | Data free after |"
+            echo "| --- | --- | --- | --- |"
+            echo "| ${mv_seconds} | ${delete_seconds} | ${free_before} | ${free_after} |"
           } >> "${GITHUB_STEP_SUMMARY}"
       - name: Time the delete of the simulator runtimes
-        if: matrix.deleter == 'rm'
         continue-on-error: true
         run: |
           set +e
