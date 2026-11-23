@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "nix-packages": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1793295165,
-        "narHash": "sha256-iLrDJYPbUE5LsMTow8zx07PYK3vH+Newpa9fl2voi+Q=",
-        "owner": "wimpysworld",
-        "repo": "nix-packages",
-        "rev": "2585fad49a8e9c1ac99e9ad0a270d2bca83dbe1b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "wimpysworld",
-        "repo": "nix-packages",
-        "type": "github"
-      }
-    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1793826729,
@@ -36,10 +16,45 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1793977579,
+        "narHash": "sha256-WrSODdZFVIs/Hh2NzC0bY+ROByi0bATg8WfePX8dPj8=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "4fe25e12eb9f4c744966dd3de5a05246cf098601",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
-        "nix-packages": "nix-packages",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "tailor": "tailor"
+      }
+    },
+    "tailor": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_2"
+      },
+      "locked": {
+        "lastModified": 1794656202,
+        "narHash": "sha256-5FikfrJjGUOpLEsgOAFwcNfNtgrNSlT4p7yMW7TbLyg=",
+        "owner": "wimpysworld",
+        "repo": "tailor",
+        "rev": "4c5d64dbd2b19b24d9e6118a9263271de86fb866",
+        "type": "github"
+      },
+      "original": {
+        "owner": "wimpysworld",
+        "ref": "latest",
+        "repo": "tailor",
+        "type": "github"
       }
     }
   },

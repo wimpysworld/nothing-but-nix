@@ -3,14 +3,13 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    nix-packages.url = "github:wimpysworld/nix-packages";
-    nix-packages.inputs.nixpkgs.follows = "nixpkgs";
+    tailor.url = "github:wimpysworld/tailor/latest";
   };
 
   outputs =
     {
       nixpkgs,
-      nix-packages,
+      tailor,
       ...
     }:
     let
@@ -36,7 +35,7 @@
         let
           pkgs = import nixpkgs { inherit system; };
           # Keep the development shell available when Tailor has no package for this system.
-          tailorPkgs = nix-packages.packages.${system} or { };
+          tailorPkgs = tailor.packages.${system} or { };
         in
         {
           default = pkgs.mkShell {
