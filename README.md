@@ -29,9 +29,13 @@
   </details>
 </div>
 
-# Nothing but Nix
+<h1 align="center">
+  <img src="pages/icon.svg" width="256" height="256" alt="Nothing but Nix">
+  <br />
+  Nothing but Nix
+</h1>
 
-**Transform your GitHub Actions runner into a [Nix](https://zero-to-nix.com/concepts/nix/) ❄️ powerhouse by ruthlessly slashing pre-installed bloat.**
+<p align="center"><b>Transform your GitHub Actions runner into a <a href="https://zero-to-nix.com/concepts/nix/">Nix</a> ❄️ powerhouse by ruthlessly slashing pre-installed bloat.</b></p>
 
 GitHub Actions runners come with about 86-88GiB free on `/` (x64) and a disk stuffed with tools that Nix never uses.
 *Nothing but Nix* **brutally purges** unnecessary software and pools the space into a compressed Btrfs `/nix`, giving you **about 75GiB to 129GiB** for your Nix store! 💪
