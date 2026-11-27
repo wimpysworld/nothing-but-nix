@@ -167,7 +167,7 @@ jobs:
         env:
           HATCHET_PROTOCOL: ${{ matrix.hatchet-protocol }}
         run: bash ./.github/actions/this/.github/scripts/check-nix-volume.sh "${HATCHET_PROTOCOL}"
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@v32
       - name: Nix
         run: |
           nix --version
@@ -305,7 +305,7 @@ jobs:
         run: bash ./.github/actions/this/.github/scripts/check-macos.sh "${HATCHET_PROTOCOL}" "${ROOT_FREE_BYTES}"
       - uses: DeterminateSystems/determinate-nix-action@main
         if: matrix.installer == 'determinate-nix-action'
-      - uses: cachix/install-nix-action@v31
+      - uses: cachix/install-nix-action@v32
         if: matrix.installer == 'cachix-nix-action'
       - uses: nixbuild/nix-quick-install-action@v35
         if: matrix.installer == 'nix-quick-install'
