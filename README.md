@@ -1,7 +1,6 @@
-
 <div align="right">
   <details>
-    <summary >🌐 Language</summary>
+    <summary>🌐 Language</summary>
     <div>
       <div align="center">
         <a href="https://openaitx.github.io/view.html?user=wimpysworld&project=nothing-but-nix&lang=en">English</a>
@@ -29,17 +28,45 @@
   </details>
 </div>
 
-<h1 align="center">
-  <img src="pages/icon.svg" width="256" height="256" alt="Nothing but Nix">
-  <br />
-  Nothing but Nix
-</h1>
+<!-- tailor:social-header:start -->
+<p align="center">
+  <a href="https://nothing-but-nix.wimpys.world"><picture><source media="(prefers-color-scheme: dark)" srcset="pages/social/hero-dark.svg"><img src="pages/social/hero-light.svg" alt="Nothing But Nix"></picture></a>
+</p>
+<!-- tailor:social-header:end -->
 
-<p align="center"><b>Transform your GitHub Actions runner into a <a href="https://zero-to-nix.com/concepts/nix/">Nix</a> ❄️ powerhouse by ruthlessly slashing pre-installed bloat.</b></p>
+<!-- tailor:social-links:start -->
+<p align="center">
+  <a href="https://bsky.app/profile/wimpys.world"><picture><source media="(prefers-color-scheme: dark)" srcset="pages/social/link-bluesky-dark.svg"><img src="pages/social/link-bluesky-light.svg" alt="Bluesky"></picture></a>
+  <a href="https://wimpysworld.social/@martin"><picture><source media="(prefers-color-scheme: dark)" srcset="pages/social/link-mastodon-dark.svg"><img src="pages/social/link-mastodon-light.svg" alt="Mastodon"></picture></a>
+  <a href="https://linkedin.com/in/martinwimpress"><picture><source media="(prefers-color-scheme: dark)" srcset="pages/social/link-linkedin-dark.svg"><img src="pages/social/link-linkedin-light.svg" alt="LinkedIn"></picture></a>
+</p>
+<!-- tailor:social-links:end -->
+
+<!-- tailor:social-community:start -->
+<p align="center">
+  <a href="https://discord.com/invite/vUsydfP"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/community-dark.svg"><img src="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/community-light.svg" alt="Discord community"></picture></a>
+</p>
+<!-- tailor:social-community:end -->
+
+**Transform your GitHub Actions runner into a [Nix](https://zero-to-nix.com/concepts/nix/) ❄️ powerhouse by ruthlessly slashing pre-installed bloat.**
 
 GitHub Actions runners come with about 86-88GiB free on `/` (x64) and a disk stuffed with tools that Nix never uses.
 *Nothing but Nix* **brutally purges** unnecessary software and pools the space into a compressed Btrfs `/nix`, giving you **about 75GiB to 129GiB** for your Nix store! 💪
 On macOS runners on Apple silicon it takes the hatchet to Xcode, simulators, and friends, so the Nix installer has room to breathe. 🍎
+
+## Features
+
+- **Instant Btrfs `/nix` pool**: mounts a `zstd:1` compressed Btrfs volume in 1 to 3 seconds so your workflow continues immediately.
+- **Parallel background purging**: removes unused SDKs, Docker images, snaps, and caches with `rmz` while dynamically expanding `/nix`.
+- **Four Hatchet Protocols**: choose `holster`, `carve`, `cleave` (default), or `rampage` to balance reclaimed space against runner tooling.
+- **Ubuntu and Apple silicon support**: tested on Ubuntu 22.04, 24.04, and 26.04 (x64 and arm64) and Apple silicon macOS (`macos-15` and `macos-26`), with clean skips on Intel macOS, Windows, and container runners.
+- **Tunable storage and outputs**: configure safe havens, Btrfs compression, user ownership of `/nix`, synchronous purging, and structured step outputs.
+
+<!-- tailor:social-stats:start -->
+<p align="center">
+  <a href="https://github.com/wimpysworld/nothing-but-nix/pulse"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/stats-dark.svg"><img src="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/stats-light.svg" alt="Nothing But Nix statistics"></picture></a>
+</p>
+<!-- tailor:social-stats:end -->
 
 ## Usage 🔧
 
@@ -71,6 +98,12 @@ jobs:
 - **Intel macOS runners** such as `macos-15-intel`: This action will gracefully skip with a notice. Nixpkgs is deprecating `x86_64-darwin`, so Intel Macs get no hatchet
 - **Windows runners**: This action will gracefully skip with a warning if run on Windows. Windows runners have different filesystem layouts and constraints
 - **Container runners such as `ubuntu-slim`**: This action will gracefully skip with a warning when the runner has no loop devices. The action checks that `/dev/loop-control` exists and that `sudo -n losetup --find` succeeds. `ubuntu-slim` is an unprivileged container with no loop devices and no mount support, so a later Nix install uses the container disk as it is
+
+<!-- tailor:social-sponsors:start -->
+<p align="center">
+  <a href="https://github.com/sponsors/flexiondotorg"><picture><source media="(prefers-color-scheme: dark)" srcset="pages/social/sponsors-dark.svg"><img src="pages/social/sponsors-light.svg" alt="Nothing But Nix sponsors"></picture></a>
+</p>
+<!-- tailor:social-sponsors:end -->
 
 ## The Problem: Making Room for Nix to Thrive 🌱
 
@@ -365,3 +398,21 @@ If your build runs out of space despite using Nothing but Nix, it's likely becau
 This adds about 103-214 seconds to your workflow setup with Rampage (about 42-135 seconds with Cleave, 19-86 seconds with Carve), but guarantees maximum space is available when your build begins.
 
 Now go and build something amazing with all that glorious Nix store space! ❄️
+
+<!-- tailor:social-stars:start -->
+<p align="center">
+  <a href="https://github.com/wimpysworld/nothing-but-nix/stargazers"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/stars-dark.svg"><img src="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/stars-light.svg" alt="Nothing But Nix star history"></picture></a>
+</p>
+<!-- tailor:social-stars:end -->
+
+<!-- tailor:social-contributors:start -->
+<p align="center">
+  <a href="https://github.com/wimpysworld/nothing-but-nix/graphs/contributors"><picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/contributors-dark.svg"><img src="https://raw.githubusercontent.com/wimpysworld/nothing-but-nix/social-assets/contributors-light.svg" alt="Nothing But Nix contributors"></picture></a>
+</p>
+<!-- tailor:social-contributors:end -->
+
+<!-- tailor:social-footer:start -->
+<p align="center">
+  <a href="https://tailor.wimpys.world"><picture><source media="(prefers-color-scheme: dark)" srcset="pages/social/footer-dark.svg"><img src="pages/social/footer-light.svg" alt="Fitted by Tailor"></picture></a>
+</p>
+<!-- tailor:social-footer:end -->

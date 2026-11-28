@@ -131,9 +131,10 @@ ruleset:
 # branch: omit to use the current repository default branch.
 # cname: omit to preserve the domain, use "" to clear it, or set a domain.
 pages:
-  enabled: false
+  enabled: true
   generator: static
   path: pages
+  cname: nothing-but-nix.wimpys.world
   links:
     website: https://wimpys.world/
     forum: ""
@@ -165,6 +166,33 @@ pages:
   # links:
   #   website: https://example.com
   #   email: hello@example.com
+
+social:
+  enabled: true
+  theme: dark
+  og:
+    output: pages/og.png
+    include_preview: false
+  readme:
+    header: true
+    preferred_links:
+      - bluesky
+      - mastodon
+      - linkedin
+    community: auto
+    packages: []
+    stats: true
+    star_history:
+      enabled: true
+      min_stars: 25
+      min_days: 30
+    sponsors: auto
+    contributors: true
+    demo: false
+    footer: true
+  live:
+    branch: social-assets
+    schedule: "0 4 * * *"
 
 labels:
   - name: bug
